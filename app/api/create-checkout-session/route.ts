@@ -2,9 +2,15 @@ import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not set');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-01-27.acacia',
 });
+
+const PRICE_ID = 'price_1OocqGGEHfPiJwM4A8f5Rjlu'; // Replace with your actual price ID
 
 export async function POST() {
   try {
@@ -21,32 +27,29 @@ export async function POST() {
       );
     }
 
+    // Create Stripe checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'payment',
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: '30-Day Unlimited Access',
-              description: 'Full access to all MatchPro Resume features for 30 days',
-            },
-            unit_amount: 1999, // $19.99 in cents
-          },
+          price: PRICE_ID,
           quantity: 1,
         },
       ],
-      mode: 'payment',
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/pricing`,
       customer_email: session.user.email,
+      metadata: {
+        userId: session.user.id,
+      },
     });
 
     return NextResponse.json({ sessionId: checkoutSession.id });
   } catch (error) {
     console.error('Error creating checkout session:', error);
     return NextResponse.json(
-      { error: 'Error creating checkout session' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
