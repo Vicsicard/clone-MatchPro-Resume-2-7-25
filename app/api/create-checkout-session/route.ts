@@ -30,7 +30,7 @@ const getSiteUrl = (request: Request): string => {
 };
 
 // This is your price ID for the $19.99 subscription
-const PRICE_ID = 'price_1OocqGGEHfPiJwM4oGEGxwJa';
+const PRICE_ID = 'price_1QkpKCGEHfPiJwM4Wti4uP4V';
 
 export async function POST(request: Request) {
   console.log('Starting checkout session creation...');
