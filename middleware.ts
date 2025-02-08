@@ -18,6 +18,8 @@ export const config = {
   ],
 };
 
+const PUBLIC_ROUTES = ['/', '/pricing'];
+
 export async function middleware(req: NextRequest) {
   try {
     const res = NextResponse.next();
@@ -27,14 +29,20 @@ export async function middleware(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    // If user is not signed in and the current path is not / or /pricing,
-    // redirect the user to /auth/sign-in
-    if (!session && !["/", "/pricing"].includes(req.nextUrl.pathname)) {
+    const pathname = req.nextUrl.pathname;
+
+    // Allow public routes
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      return res;
+    }
+
+    // If not signed in, redirect to sign in
+    if (!session) {
       return NextResponse.redirect(new URL('/auth/sign-in', req.url));
     }
 
     // Special handling for dashboard access
-    if (req.nextUrl.pathname.startsWith('/dashboard')) {
+    if (pathname.startsWith('/dashboard')) {
       const hasValidSubscription = await checkSubscription(req);
       
       if (!hasValidSubscription) {
@@ -46,7 +54,7 @@ export async function middleware(req: NextRequest) {
     return res;
   } catch (e) {
     console.error('Middleware error:', e);
-    // On error, allow the request to continue
-    return NextResponse.next();
+    // On error, redirect to sign in
+    return NextResponse.redirect(new URL('/auth/sign-in', req.url));
   }
 }
