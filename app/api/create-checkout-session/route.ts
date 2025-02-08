@@ -13,7 +13,8 @@ const getStripe = () => {
   });
 };
 
-const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH';
+// This is your price ID for the $19.99 subscription
+const PRICE_ID = 'price_1OocqGGEHfPiJwM4oGEGxwJa';
 
 export async function POST() {
   try {
@@ -52,6 +53,21 @@ export async function POST() {
     try {
       const stripe = getStripe();
       console.log('Creating Stripe checkout session...');
+      
+      // First verify that the price exists
+      try {
+        const price = await stripe.prices.retrieve(PRICE_ID);
+        console.log('Price verified:', price.id);
+      } catch (priceError: any) {
+        console.error('Price not found:', PRICE_ID);
+        return NextResponse.json(
+          { 
+            error: 'Invalid price configuration',
+            details: 'The specified price does not exist'
+          },
+          { status: 400 }
+        );
+      }
       
       const checkoutSession = await stripe.checkout.sessions.create({
         mode: 'payment',
