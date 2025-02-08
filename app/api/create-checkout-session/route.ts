@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-01-27.acacia',
 });
 
-const PRICE_ID = 'price_1OocqGGEHfPiJwM4A8f5Rjlu'; // Replace with your actual price ID
+const PRICE_ID = 'price_1QkpKCGEHfPiJwM4Wti4uP4V'; // Replace with your actual price ID
 
 export async function POST() {
   try {
