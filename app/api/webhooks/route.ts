@@ -3,14 +3,16 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-if (!process.env.STRIPE_SECRET_KEY || !webhookSecret) {
+if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
   throw new Error('Missing Stripe environment variables');
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-01-27.acacia',
 });
+
+// Assert webhook secret as string since we checked it above
+const webhookSecret: string = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req: Request) {
   try {
