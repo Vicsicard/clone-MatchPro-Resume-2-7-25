@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+if (!process.env.STRIPE_SECRET_KEY || !webhookSecret) {
   throw new Error('Missing Stripe environment variables');
 }
 
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET
+      webhookSecret
     );
 
     if (event.type === 'checkout.session.completed') {
