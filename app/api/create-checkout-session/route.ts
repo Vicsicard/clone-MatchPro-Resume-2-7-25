@@ -33,6 +33,8 @@ const getSiteUrl = (request: Request): string => {
 const PRICE_ID = 'price_1OocqGGEHfPiJwM4oGEGxwJa';
 
 export async function POST(request: Request) {
+  console.log('Starting checkout session creation...');
+  
   try {
     const siteUrl = getSiteUrl(request);
     console.log('Using site URL:', siteUrl);
@@ -49,8 +51,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!session) {
-      console.error('No session found');
+    if (!session?.user) {
+      console.error('No authenticated user found');
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
@@ -65,21 +67,24 @@ export async function POST(request: Request) {
       
       // First verify that the price exists
       try {
+        console.log('Verifying price ID:', PRICE_ID);
         const price = await stripe.prices.retrieve(PRICE_ID);
-        console.log('Price verified:', price.id);
+        console.log('Price verified:', {
+          id: price.id,
+          active: price.active,
+          currency: price.currency,
+          type: price.type,
+        });
       } catch (priceError: any) {
-        console.error('Price not found:', PRICE_ID);
+        console.error('Price verification failed:', priceError);
         return NextResponse.json(
-          { 
-            error: 'Invalid price configuration',
-            details: 'The specified price does not exist'
-          },
+          { error: 'Invalid price', details: priceError.message },
           { status: 400 }
         );
       }
       
       const checkoutSession = await stripe.checkout.sessions.create({
-        mode: 'payment',
+        mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [
           {
@@ -98,39 +103,27 @@ export async function POST(request: Request) {
       console.log('Checkout session created:', {
         id: checkoutSession.id,
         url: checkoutSession.url,
+        status: checkoutSession.status,
       });
 
-      return NextResponse.json({ 
-        sessionId: checkoutSession.id,
-        url: checkoutSession.url 
-      });
+      return NextResponse.json({ url: checkoutSession.url });
     } catch (stripeError: any) {
       console.error('Stripe error:', {
         message: stripeError.message,
         type: stripeError.type,
         code: stripeError.code,
+        requestId: stripeError.requestId,
       });
       
       return NextResponse.json(
-        { 
-          error: 'Stripe error',
-          details: stripeError.message,
-          code: stripeError.code 
-        },
+        { error: stripeError.message },
         { status: 500 }
       );
     }
   } catch (error: any) {
-    console.error('Server error:', {
-      message: error.message,
-      stack: error.stack,
-    });
-    
+    console.error('Server error:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error.message 
-      },
+      { error: error.message },
       { status: 500 }
     );
   }

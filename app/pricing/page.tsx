@@ -4,6 +4,16 @@ import { useState } from 'react';
 import { createClient } from '@/app/supabase/client';
 import { useRouter } from 'next/navigation';
 
+// Get the base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // We're on the client side
+    return '';  // Use relative URLs on client side
+  }
+  // We're on the server side
+  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+};
+
 export default function Pricing() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +68,7 @@ export default function Pricing() {
         throw new Error('Please sign in first');
       }
 
+      // Always use relative URL for API calls
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -65,19 +76,21 @@ export default function Pricing() {
         },
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         console.error('Checkout error:', data);
-        throw new Error(data.details || data.error || 'Failed to create checkout session');
+        throw new Error(data.error || 'Failed to create checkout session');
       }
+
+      const data = await response.json();
+      console.log('Checkout response:', data);
 
       if (!data.url) {
         console.error('No checkout URL in response:', data);
         throw new Error('No checkout URL returned');
       }
 
-      console.log('Redirecting to checkout:', data.url);
+      // Redirect to Stripe checkout
       window.location.href = data.url;
     } catch (error: any) {
       console.error('Subscription error:', error);
