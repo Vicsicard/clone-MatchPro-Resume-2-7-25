@@ -104,76 +104,78 @@ export default function ResumeUpload() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* File Upload Area */}
       <div
         {...getRootProps()}
         className={`
-          border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer bg-white
-          ${isDragActive ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-600'}
+          border-2 border-white/20 rounded-lg p-6 transition-colors text-center cursor-pointer
+          ${isDragActive ? 'border-white bg-white/10' : 'hover:border-white hover:bg-white/5'}
         `}
         data-testid="dropzone"
       >
         <input {...getInputProps()} />
-        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDragActive ? 'text-blue-600' : 'text-gray-400'}`} />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {isDragActive ? 'Drop your files here' : 'Upload your resume and job description'}
+        <Upload className="mx-auto h-8 w-8 mb-3 text-white/80" />
+        <h3 className="text-base font-medium mb-1">
+          {isDragActive ? 'Drop your files here' : 'Upload your files'}
         </h3>
-        <p className="text-gray-500">
-          Drag and drop or click to select files
+        <p className="text-sm text-white/80">
+          Drag and drop or click to select
         </p>
       </div>
 
       {/* File List */}
-      <div className="space-y-3">
-        {files.resume && (
-          <div className="flex items-center justify-between bg-white p-4 rounded-lg">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-5 w-5 text-blue-600" />
-              <span className="text-gray-700">{files.resume.name}</span>
+      {(files.resume || files.jobDescription) && (
+        <div className="bg-white/10 rounded-lg p-4 space-y-2">
+          {files.resume && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-white/80" />
+                <span className="text-sm text-white/90">{files.resume.name}</span>
+              </div>
+              <button
+                onClick={() => removeFile('resume')}
+                className="text-white/60 hover:text-white/90 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              onClick={() => removeFile('resume')}
-              className="text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        )}
-        {files.jobDescription && (
-          <div className="flex items-center justify-between bg-white p-4 rounded-lg">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-5 w-5 text-blue-600" />
-              <span className="text-gray-700">{files.jobDescription.name}</span>
+          )}
+          {files.jobDescription && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-white/80" />
+                <span className="text-sm text-white/90">{files.jobDescription.name}</span>
+              </div>
+              <button
+                onClick={() => removeFile('jobDescription')}
+                className="text-white/60 hover:text-white/90 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              onClick={() => removeFile('jobDescription')}
-              className="text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Status Messages */}
       {error && (
-        <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-lg">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+        <div className="bg-red-500/20 text-red-100 p-3 rounded-lg flex items-center space-x-2 text-sm">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>{error}</p>
         </div>
       )}
       {success && (
-        <div className="flex items-center space-x-2 text-green-600 bg-green-50 p-4 rounded-lg">
-          <CheckCircle className="h-5 w-5 flex-shrink-0" />
+        <div className="bg-green-500/20 text-green-100 p-3 rounded-lg flex items-center space-x-2 text-sm">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
           <p>Files processed successfully!</p>
         </div>
       )}
 
       {/* Loading State */}
       {loading && (
-        <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+        <div className="flex justify-center py-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/20 border-t-white"></div>
         </div>
       )}
 
@@ -181,7 +183,7 @@ export default function ResumeUpload() {
       {(files.resume || files.jobDescription) && !loading && (
         <button
           onClick={() => handleSubmit(files)}
-          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          className="w-full bg-white text-[#2563eb] py-2 px-4 rounded-lg hover:bg-white/90 transition-colors font-medium text-sm"
         >
           Start Analysis
         </button>
