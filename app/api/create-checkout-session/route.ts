@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { headers } from 'next/headers';
 
 // Initialize Stripe only when needed to avoid build issues
 const getStripe = () => {
@@ -9,25 +10,33 @@ const getStripe = () => {
     throw new Error('STRIPE_SECRET_KEY is required');
   }
   return new Stripe(secretKey, {
-    apiVersion: '2025-01-27.acacia',
+    apiVersion: '2023-10-16',
   });
+};
+
+// Get the site URL from environment or request
+const getSiteUrl = (request: Request): string => {
+  // First try environment variable
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // Fallback to request headers
+  const headersList = headers();
+  const host = headersList.get('host') || 'localhost:3000';
+  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+  return `${protocol}://${host}`;
 };
 
 // This is your price ID for the $19.99 subscription
 const PRICE_ID = 'price_1OocqGGEHfPiJwM4oGEGxwJa';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    console.log('Site URL:', siteUrl); // Debug log
-    
-    if (!siteUrl) {
-      console.error('NEXT_PUBLIC_SITE_URL is not set');
-      throw new Error('NEXT_PUBLIC_SITE_URL is required');
-    }
+    const siteUrl = getSiteUrl(request);
+    console.log('Using site URL:', siteUrl);
 
-    console.log('Starting checkout session creation...');
-    
     const supabase = createServerSupabaseClient();
     
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -86,7 +95,11 @@ export async function POST() {
         },
       });
 
-      console.log('Checkout session created successfully:', checkoutSession.id);
+      console.log('Checkout session created:', {
+        id: checkoutSession.id,
+        url: checkoutSession.url,
+      });
+
       return NextResponse.json({ 
         sessionId: checkoutSession.id,
         url: checkoutSession.url 

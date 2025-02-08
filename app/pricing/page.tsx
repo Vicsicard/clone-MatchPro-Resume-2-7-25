@@ -65,20 +65,22 @@ export default function Pricing() {
         },
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to create checkout session');
+        console.error('Checkout error:', data);
+        throw new Error(data.details || data.error || 'Failed to create checkout session');
       }
 
-      const { url } = await response.json();
-      
-      if (!url) {
+      if (!data.url) {
+        console.error('No checkout URL in response:', data);
         throw new Error('No checkout URL returned');
       }
 
-      window.location.href = url;
+      console.log('Redirecting to checkout:', data.url);
+      window.location.href = data.url;
     } catch (error: any) {
-      console.error('Stripe checkout error:', error);
+      console.error('Subscription error:', error);
       setError(error.message);
     } finally {
       setLoading(false);
