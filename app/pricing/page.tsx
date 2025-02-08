@@ -4,25 +4,17 @@ import { useState } from 'react';
 import { createClient } from '@/app/supabase/client';
 import { useRouter } from 'next/navigation';
 
-// Get the base URL for API calls
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    // We're on the client side
-    return '';  // Use relative URLs on client side
-  }
-  // We're on the server side
-  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-};
-
 export default function Pricing() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const router = useRouter();
   const supabase = createClient();
 
   const handleFreeTrial = async () => {
     setLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -60,6 +52,7 @@ export default function Pricing() {
   const handlePaidSubscription = async () => {
     setLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -68,7 +61,7 @@ export default function Pricing() {
         throw new Error('Please sign in first');
       }
 
-      // Always use relative URL for API calls
+      // Create checkout session
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -76,14 +69,13 @@ export default function Pricing() {
         },
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        console.error('Checkout error:', data);
-        throw new Error(data.error || 'Failed to create checkout session');
-      }
-
       const data = await response.json();
       console.log('Checkout response:', data);
+
+      if (!response.ok) {
+        setDebugInfo(data);
+        throw new Error(data.error || data.details || 'Failed to create checkout session');
+      }
 
       if (!data.url) {
         console.error('No checkout URL in response:', data);
@@ -113,8 +105,29 @@ export default function Pricing() {
         </div>
 
         {error && (
-          <div className="mt-8 max-w-md mx-auto bg-red-50 text-red-500 p-4 rounded-md">
-            {error}
+          <div className="mt-8 max-w-md mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Error
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                    {debugInfo && (
+                      <pre className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto">
+                        {JSON.stringify(debugInfo, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

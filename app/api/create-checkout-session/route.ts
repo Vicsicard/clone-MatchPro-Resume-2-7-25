@@ -40,6 +40,12 @@ const getPriceId = () => {
 
 export async function POST(request: Request) {
   console.log('Starting checkout session creation...');
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Available env vars:', {
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? 'set' : 'not set',
+    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || 'not set',
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'not set'
+  });
   
   try {
     const siteUrl = getSiteUrl(request);
