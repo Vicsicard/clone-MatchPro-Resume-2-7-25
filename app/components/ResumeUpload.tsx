@@ -109,33 +109,33 @@ export default function ResumeUpload() {
       <div
         {...getRootProps()}
         className={`
-          border-2 border-white/20 rounded-lg p-6 transition-colors text-center cursor-pointer
-          ${isDragActive ? 'border-white bg-white/10' : 'hover:border-white hover:bg-white/5'}
+          border border-white/20 rounded p-6 transition-colors text-center cursor-pointer
+          ${isDragActive ? 'border-white/40 bg-white/5' : 'hover:border-white/40 hover:bg-white/5'}
         `}
         data-testid="dropzone"
       >
         <input {...getInputProps()} />
-        <Upload className="mx-auto h-8 w-8 mb-3 text-white/80" />
-        <h3 className="text-base font-medium mb-1">
+        <Upload className="mx-auto h-6 w-6 mb-2 text-white/80" />
+        <h3 className="text-[15px] font-medium mb-1 text-white">
           {isDragActive ? 'Drop your files here' : 'Upload your files'}
         </h3>
-        <p className="text-sm text-white/80">
+        <p className="text-[13px] text-white/80">
           Drag and drop or click to select
         </p>
       </div>
 
       {/* File List */}
       {(files.resume || files.jobDescription) && (
-        <div className="bg-white/10 rounded-lg p-4 space-y-2">
+        <div className="bg-white/5 rounded p-3 space-y-2">
           {files.resume && (
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <FileText className="h-4 w-4 text-white/80" />
-                <span className="text-sm text-white/90">{files.resume.name}</span>
+                <FileText className="h-4 w-4 text-white/70" />
+                <span className="text-[13px] text-white/90">{files.resume.name}</span>
               </div>
               <button
                 onClick={() => removeFile('resume')}
-                className="text-white/60 hover:text-white/90 transition-colors"
+                className="text-white/50 hover:text-white/80 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -144,12 +144,12 @@ export default function ResumeUpload() {
           {files.jobDescription && (
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <FileText className="h-4 w-4 text-white/80" />
-                <span className="text-sm text-white/90">{files.jobDescription.name}</span>
+                <FileText className="h-4 w-4 text-white/70" />
+                <span className="text-[13px] text-white/90">{files.jobDescription.name}</span>
               </div>
               <button
                 onClick={() => removeFile('jobDescription')}
-                className="text-white/60 hover:text-white/90 transition-colors"
+                className="text-white/50 hover:text-white/80 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -160,13 +160,13 @@ export default function ResumeUpload() {
 
       {/* Status Messages */}
       {error && (
-        <div className="bg-red-500/20 text-red-100 p-3 rounded-lg flex items-center space-x-2 text-sm">
+        <div className="bg-red-500/10 text-red-100 p-3 rounded flex items-center space-x-2 text-[13px]">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>{error}</p>
         </div>
       )}
       {success && (
-        <div className="bg-green-500/20 text-green-100 p-3 rounded-lg flex items-center space-x-2 text-sm">
+        <div className="bg-green-500/10 text-green-100 p-3 rounded flex items-center space-x-2 text-[13px]">
           <CheckCircle className="h-4 w-4 flex-shrink-0" />
           <p>Files processed successfully!</p>
         </div>
@@ -175,7 +175,7 @@ export default function ResumeUpload() {
       {/* Loading State */}
       {loading && (
         <div className="flex justify-center py-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/20 border-t-white"></div>
+          <div className="animate-spin rounded-full h-5 w-5 border border-white/20 border-t-white"></div>
         </div>
       )}
 
@@ -183,7 +183,7 @@ export default function ResumeUpload() {
       {(files.resume || files.jobDescription) && !loading && (
         <button
           onClick={() => handleSubmit(files)}
-          className="w-full bg-white text-[#2563eb] py-2 px-4 rounded-lg hover:bg-white/90 transition-colors font-medium text-sm"
+          className="w-full bg-white text-[#2563eb] py-2 px-4 rounded font-medium text-[13px] hover:bg-white/90 transition-colors"
         >
           Start Analysis
         </button>
