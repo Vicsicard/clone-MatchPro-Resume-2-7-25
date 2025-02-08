@@ -53,11 +53,11 @@ export default function Home() {
               </nav>
             </div>
             <div className="flex items-center space-x-6">
-              <Link href="/signin" className="text-[15px] text-gray-600 hover:text-gray-900">
+              <Link href="/auth/sign-in" className="text-[15px] text-gray-600 hover:text-gray-900">
                 Sign in
               </Link>
               <Link 
-                href="/get-started"
+                href="/auth/sign-up"
                 className="bg-[#2563eb] text-white px-5 py-2.5 rounded text-[15px] font-medium hover:bg-blue-700"
               >
                 Get Started
@@ -80,7 +80,7 @@ export default function Home() {
           </p>
           <div className="flex items-center justify-center space-x-4 mb-10">
             <Link 
-              href="/get-started"
+              href="/auth/sign-up"
               className="bg-[#2563eb] text-white px-7 py-3 rounded-lg text-[15px] font-medium hover:bg-blue-700"
             >
               Get Started Free
@@ -149,7 +149,10 @@ export default function Home() {
             <p className="text-[19px] mb-8 opacity-90 leading-relaxed">
               Join thousands of job seekers who have successfully landed their dream jobs using our platform
             </p>
-            <button className="bg-white text-[#2563eb] px-8 py-3.5 rounded-lg text-[15px] font-medium hover:bg-white/90 transition-colors">
+            <button 
+              onClick={() => window.location.href = '/auth/sign-up'} 
+              className="bg-white text-[#2563eb] px-8 py-3.5 rounded-lg text-[15px] font-medium hover:bg-white/90 transition-colors"
+            >
               Get Started Now
             </button>
           </div>
