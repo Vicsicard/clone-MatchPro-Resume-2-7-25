@@ -4,14 +4,25 @@ import Stripe from 'stripe';
 import { headers } from 'next/headers';
 
 // Initialize Stripe only when needed to avoid build issues
-const getStripe = () => {
+const PRICE_IDS = {
+  test: 'price_1Qkq56GEHfPiJwM4oJBkcV5X',  // Test mode price
+  live: 'price_1QkpKCGEHfPiJwM4Wti4uP4V'   // Live mode price
+};
+
+const getStripeAndMode = () => {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
     throw new Error('STRIPE_SECRET_KEY is required');
   }
-  return new Stripe(secretKey, {
-    apiVersion: '2025-01-27.acacia',
-  });
+  
+  // Detect if we're using test or live mode based on the API key
+  const isTestMode = secretKey.startsWith('sk_test_');
+  console.log('Stripe mode:', isTestMode ? 'test' : 'live');
+  
+  return {
+    stripe: new Stripe(secretKey, { apiVersion: '2025-01-27.acacia' }),
+    isTestMode
+  };
 };
 
 // Get the site URL from environment or request
@@ -29,21 +40,11 @@ const getSiteUrl = (request: Request): string => {
   return `${protocol}://${host}`;
 };
 
-// Get price ID from environment
-const getPriceId = () => {
-  const priceId = process.env.STRIPE_PRICE_ID;
-  if (!priceId) {
-    throw new Error('STRIPE_PRICE_ID is required');
-  }
-  return priceId;
-};
-
 export async function POST(request: Request) {
   console.log('Starting checkout session creation...');
   console.log('Environment:', process.env.NODE_ENV);
   console.log('Available env vars:', {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? 'set' : 'not set',
-    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || 'not set',
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'not set'
   });
   
@@ -74,12 +75,11 @@ export async function POST(request: Request) {
     console.log('User authenticated:', session.user.id);
 
     try {
-      const stripe = getStripe();
-      console.log('Creating Stripe checkout session...');
+      // Get Stripe instance and determine mode
+      const { stripe, isTestMode } = getStripeAndMode();
+      const priceId = isTestMode ? PRICE_IDS.test : PRICE_IDS.live;
+      console.log('Using price ID:', priceId, 'in', isTestMode ? 'test' : 'live', 'mode');
       
-      const priceId = getPriceId();
-      console.log('Using price ID:', priceId);
-
       // First verify that the price exists
       try {
         console.log('Verifying price ID:', priceId);
