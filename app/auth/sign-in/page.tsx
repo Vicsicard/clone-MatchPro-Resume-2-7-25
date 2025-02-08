@@ -19,16 +19,34 @@ export default function SignIn() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        throw error;
+      if (signInError) {
+        throw signInError;
       }
 
-      router.push('/dashboard');
+      // Check subscription status
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('is_active', true)
+        .single();
+
+      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        // PGRST116 means no rows returned
+        console.error('Error checking subscription:', subscriptionError);
+      }
+
+      // If no active subscription, redirect to pricing
+      if (!subscription) {
+        router.push('/pricing');
+      } else {
+        router.push('/dashboard');
+      }
+      
       router.refresh();
     } catch (error: any) {
       setError(error.message);
@@ -74,6 +92,7 @@ export default function SignIn() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -92,6 +111,7 @@ export default function SignIn() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -100,7 +120,7 @@ export default function SignIn() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#2563eb] hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#2563eb] hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
