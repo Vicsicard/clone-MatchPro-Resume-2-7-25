@@ -28,27 +28,49 @@ export default function SignIn() {
         throw signInError;
       }
 
-      // Check subscription status
+      // Get user session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Authentication failed');
+      }
+
+      // Check if user has any subscription
       const { data: subscription, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .select('*')
+        .eq('user_id', session.user.id)
         .eq('is_active', true)
         .single();
 
       if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        // PGRST116 means no rows returned
         console.error('Error checking subscription:', subscriptionError);
       }
 
-      // If no active subscription, redirect to pricing
-      if (!subscription) {
+      // Always redirect to pricing if no active subscription
+      if (!subscription || !subscription.is_active) {
+        console.log('No active subscription, redirecting to pricing');
         router.push('/pricing');
       } else {
-        router.push('/dashboard');
+        // Only redirect to dashboard if they have an active subscription
+        const now = new Date();
+        const endDate = new Date(subscription.subscription_type === 'trial' 
+          ? subscription.trial_end 
+          : subscription.subscription_end
+        );
+        
+        if (now > endDate) {
+          console.log('Subscription expired, redirecting to pricing');
+          router.push('/pricing');
+        } else {
+          console.log('Active subscription found, redirecting to dashboard');
+          router.push('/dashboard');
+        }
       }
-      
+
       router.refresh();
     } catch (error: any) {
+      console.error('Sign-in error:', error);
       setError(error.message);
     } finally {
       setLoading(false);
