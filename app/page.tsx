@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import ResumeUpload from '@/app/components/ResumeUpload';
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
@@ -20,27 +22,86 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      <main className="container mx-auto px-4 py-6 max-w-[1200px]">
+      {/* Top Banner */}
+      <div className="bg-[#2563eb] text-white text-[13px] py-2">
+        <div className="container mx-auto px-4 max-w-[1200px]">
+          <div className="flex items-center justify-center space-x-1">
+            <span>New: AI-powered keyword optimization</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
+      <header className="border-b border-gray-200">
+        <div className="container mx-auto px-4 max-w-[1200px]">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-12">
+              <Link href="/" className="text-[15px] font-semibold">
+                MatchPro Resume
+              </Link>
+              <nav className="hidden md:flex space-x-8">
+                <Link href="/features" className="text-[14px] text-gray-600 hover:text-gray-900">
+                  Features
+                </Link>
+                <Link href="/pricing" className="text-[14px] text-gray-600 hover:text-gray-900">
+                  Pricing
+                </Link>
+                <Link href="/about" className="text-[14px] text-gray-600 hover:text-gray-900">
+                  About
+                </Link>
+              </nav>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link href="/signin" className="text-[14px] text-gray-600 hover:text-gray-900">
+                Sign in
+              </Link>
+              <Link 
+                href="/get-started"
+                className="bg-[#2563eb] text-white px-4 py-2 rounded text-[14px] hover:bg-blue-700"
+              >
+                Get Started
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-16 max-w-[1200px]">
         {/* Hero Section */}
-        <div className="text-center mb-20">
-          <h1 className="text-[28px] font-bold text-gray-900 mb-3">
+        <div className="text-center max-w-[720px] mx-auto">
+          <h1 className="text-[40px] font-bold text-gray-900 mb-4 leading-tight">
             Land Your Dream Job with
             <br />
-            <span className="text-[#2563eb]">AI-Optimized Resumes</span>
+            AI-Optimized Resumes
           </h1>
-          <p className="text-[15px] text-gray-600 max-w-[500px] mx-auto mb-6">
-            Get instant feedback on your resume's match with job descriptions using our advanced AI technology.
+          <p className="text-[18px] text-gray-600 mb-8">
+            Upload your resume, provide the job posting, and let our AI technology tailor your qualifications to perfectly match the position requirements.
           </p>
-          <div className="flex justify-center gap-2">
-            <button className="bg-[#2563eb] text-white px-4 py-[6px] rounded text-[13px] font-medium">
-              Upload Resume
-            </button>
-            <button className="bg-[#f1f5f9] text-gray-700 px-4 py-[6px] rounded text-[13px] font-medium">
-              Upload Job Description
-            </button>
-            <button className="bg-[#f1f5f9] text-gray-700 px-4 py-[6px] rounded text-[13px] font-medium">
-              Get Results
-            </button>
+          <div className="flex items-center justify-center space-x-4 mb-8">
+            <Link 
+              href="/get-started"
+              className="bg-[#2563eb] text-white px-6 py-3 rounded-lg text-[15px] font-medium hover:bg-blue-700"
+            >
+              Get Started Free
+            </Link>
+            <Link 
+              href="/pricing"
+              className="bg-gray-100 text-gray-900 px-6 py-3 rounded-lg text-[15px] font-medium hover:bg-gray-200"
+            >
+              View Pricing
+            </Link>
+          </div>
+          <div className="flex items-center justify-center space-x-6">
+            <div className="flex items-center text-[13px] text-gray-600">
+              <span>ATS-Friendly</span>
+            </div>
+            <div className="flex items-center text-[13px] text-gray-600">
+              <span>GDPR-Compliant</span>
+            </div>
+            <div className="flex items-center text-[13px] text-gray-600">
+              <span>256-bit Encrypted</span>
+            </div>
           </div>
         </div>
 
