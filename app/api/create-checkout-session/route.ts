@@ -10,7 +10,7 @@ const getStripe = () => {
     throw new Error('STRIPE_SECRET_KEY is required');
   }
   return new Stripe(secretKey, {
-    apiVersion: '2023-10-16',
+    apiVersion: '2025-01-27.acacia',
   });
 };
 
