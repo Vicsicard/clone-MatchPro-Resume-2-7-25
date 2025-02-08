@@ -17,7 +17,11 @@ const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH';
 
 export async function POST() {
   try {
-    if (!process.env.NEXT_PUBLIC_SITE_URL) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    console.log('Site URL:', siteUrl); // Debug log
+    
+    if (!siteUrl) {
+      console.error('NEXT_PUBLIC_SITE_URL is not set');
       throw new Error('NEXT_PUBLIC_SITE_URL is required');
     }
 
@@ -58,8 +62,8 @@ export async function POST() {
             quantity: 1,
           },
         ],
-        success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/pricing`,
+        success_url: `${siteUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteUrl}/pricing`,
         customer_email: session.user.email,
         metadata: {
           userId: session.user.id,
