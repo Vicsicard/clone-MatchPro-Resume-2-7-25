@@ -109,27 +109,27 @@ export default function ResumeUpload() {
       <div
         {...getRootProps()}
         className={`
-          border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer
-          ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-500 hover:bg-gray-50'}
+          border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer bg-white
+          ${isDragActive ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-600'}
         `}
         data-testid="dropzone"
       >
         <input {...getInputProps()} />
-        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDragActive ? 'text-blue-600' : 'text-gray-400'}`} />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {isDragActive ? 'Drop your files here' : 'Drag and drop your files'}
+          {isDragActive ? 'Drop your files here' : 'Upload your resume and job description'}
         </h3>
         <p className="text-gray-500">
-          or click to select files
+          Drag and drop or click to select files
         </p>
       </div>
 
       {/* File List */}
       <div className="space-y-3">
         {files.resume && (
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between bg-white p-4 rounded-lg">
             <div className="flex items-center space-x-3">
-              <FileText className="h-5 w-5 text-blue-500" />
+              <FileText className="h-5 w-5 text-blue-600" />
               <span className="text-gray-700">{files.resume.name}</span>
             </div>
             <button
@@ -141,9 +141,9 @@ export default function ResumeUpload() {
           </div>
         )}
         {files.jobDescription && (
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between bg-white p-4 rounded-lg">
             <div className="flex items-center space-x-3">
-              <FileText className="h-5 w-5 text-green-500" />
+              <FileText className="h-5 w-5 text-blue-600" />
               <span className="text-gray-700">{files.jobDescription.name}</span>
             </div>
             <button
@@ -173,8 +173,18 @@ export default function ResumeUpload() {
       {/* Loading State */}
       {loading && (
         <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
         </div>
+      )}
+
+      {/* Submit Button */}
+      {(files.resume || files.jobDescription) && !loading && (
+        <button
+          onClick={() => handleSubmit(files)}
+          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+        >
+          Start Analysis
+        </button>
       )}
     </div>
   )

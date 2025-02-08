@@ -1,38 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, FileText, CheckCircle } from 'lucide-react';
 import ResumeUpload from '@/app/components/ResumeUpload';
-
-function logComponentStyles(elementId: string, element: HTMLElement | null) {
-  if (!element) {
-    console.warn(`Element ${elementId} not found`);
-    return;
-  }
-
-  const computedStyle = window.getComputedStyle(element);
-  console.log(`${elementId} computed styles:`, {
-    backgroundColor: computedStyle.backgroundColor,
-    color: computedStyle.color,
-    padding: computedStyle.padding,
-    margin: computedStyle.margin,
-    display: computedStyle.display,
-    className: element.className,
-  });
-}
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    console.log('Home component mounted');
-    const header = document.querySelector('header');
-    const main = document.querySelector('main');
-    const h2 = document.querySelector('h2');
-    logComponentStyles('header', header);
-    logComponentStyles('main', main);
-    logComponentStyles('h2', h2);
   }, []);
 
   if (!isClient) {
@@ -44,69 +19,66 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Modern Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="h-6 w-6 text-blue-500" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">
-              MatchPro
-            </h1>
-          </div>
-          <nav className="hidden md:flex space-x-6">
-            <a href="#features" className="text-gray-600 hover:text-blue-500 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-gray-600 hover:text-blue-500 transition-colors">How it Works</a>
-          </nav>
+    <div className="min-h-screen bg-white">
+      <main className="container mx-auto px-4 py-12 max-w-6xl">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            Land Your Dream Job with
+            <br />
+            <span className="text-blue-600">AI-Optimized Resumes</span>
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8">
+            Get instant feedback on your resume's match with job descriptions using our advanced AI technology.
+          </p>
         </div>
-      </header>
 
-      {/* Hero Section */}
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">
-              AI-Powered Resume
-              <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent"> Optimization</span>
-            </h2>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Upload your resume and job description to get instant, AI-powered feedback on your match potential.
-            </p>
-          </div>
-
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
+        {/* Features Section */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-semibold text-center text-gray-900 mb-12">
+            Why Choose Resume Optimizer?
+          </h2>
+          <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                icon: <FileText className="h-6 w-6 text-blue-500" />,
-                title: 'Smart Analysis',
-                description: 'Advanced AI analyzes your resume against job requirements'
+                title: 'Resume Optimization',
+                description: 'Our AI analyzes your resume against job descriptions to ensure the best match.'
               },
               {
-                icon: <CheckCircle className="h-6 w-6 text-green-500" />,
-                title: 'Instant Results',
-                description: 'Get detailed feedback and suggestions in seconds'
+                title: 'Real-Time Review',
+                description: 'Get instant feedback and suggestions to improve your resume.'
               },
               {
-                icon: <ArrowRight className="h-6 w-6 text-purple-500" />,
-                title: 'Actionable Steps',
-                description: 'Clear guidance on how to improve your resume'
+                title: 'Increased Success Rate',
+                description: 'Boost your chances of landing interviews with optimized content.'
               }
             ].map((feature, index) => (
-              <div key={index} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="bg-gray-50 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                  {feature.icon}
+              <div key={index} className="bg-blue-50 rounded-lg p-6 text-center">
+                <div className="bg-blue-600 w-12 h-12 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                  <div className="w-6 h-6 bg-white rounded"></div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Upload Component */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-            <ResumeUpload />
+        {/* Upload Section */}
+        <div className="bg-blue-50 rounded-2xl p-8 md:p-12">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+              Ready to boost your career?
+            </h2>
+            <p className="text-gray-600">
+              Start optimizing your resume today.
+            </p>
           </div>
+          <ResumeUpload />
         </div>
       </main>
     </div>
