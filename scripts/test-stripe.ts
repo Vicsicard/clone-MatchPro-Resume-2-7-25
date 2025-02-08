@@ -25,6 +25,7 @@ async function listStripePrices() {
 
     console.log('Found', prices.data.length, 'active prices:');
     prices.data.forEach(price => {
+      const productData = price.product as Stripe.Product;
       console.log({
         id: price.id,
         nickname: price.nickname,
@@ -32,11 +33,11 @@ async function listStripePrices() {
         unit_amount: price.unit_amount,
         type: price.type,
         recurring: price.recurring,
-        product: typeof price.product === 'object' ? {
-          id: price.product.id,
-          name: price.product.name,
-          active: price.product.active,
-        } : price.product,
+        product: typeof price.product === 'object' && !('deleted' in price.product) ? {
+          id: productData.id,
+          name: productData.name,
+          active: productData.active,
+        } : null,
       });
     });
   } catch (error: any) {
