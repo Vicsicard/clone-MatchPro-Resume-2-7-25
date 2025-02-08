@@ -26,9 +26,10 @@ export default function Pricing() {
         method: 'POST',
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to start trial');
+        throw new Error(data.details || data.error || 'Failed to start trial');
       }
       
       router.push('/dashboard');
@@ -44,24 +45,28 @@ export default function Pricing() {
     setLoading(true);
     setError(null);
     try {
-      // Create Stripe checkout session
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create checkout session');
+        throw new Error(data.details || data.error || 'Failed to create checkout session');
       }
 
-      const { sessionId } = await response.json();
+      // If we have a direct URL, use it
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
       
-      // Redirect to Stripe checkout
+      // Otherwise, use the session ID with Stripe
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe failed to load');
 
       const { error } = await stripe.redirectToCheckout({
-        sessionId,
+        sessionId: data.sessionId,
       });
 
       if (error) {

@@ -1,25 +1,45 @@
 import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { cookies } from 'next/headers';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set');
+// Validate required environment variables
+const requiredEnvVars = {
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+};
+
+// Check for missing environment variables
+const missingEnvVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
+
+if (missingEnvVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-01-27.acacia',
 });
 
-// Price for the 30-day subscription
 const PRICE_ID = 'price_1QkpKCGEHfPiJwM4Wti4uP4V';
 
 export async function POST() {
   try {
+    console.log('Starting checkout session creation...');
+    
     const supabase = createServerSupabaseClient();
     
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    // Get the session and log the attempt
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Supabase session error:', sessionError);
+      return NextResponse.json(
+        { error: 'Authentication error', details: sessionError.message },
+        { status: 401 }
+      );
+    }
 
     if (!session) {
       console.error('No session found');
@@ -29,17 +49,11 @@ export async function POST() {
       );
     }
 
-    if (!process.env.NEXT_PUBLIC_SITE_URL) {
-      console.error('NEXT_PUBLIC_SITE_URL is not set');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+    console.log('User authenticated:', session.user.id);
 
-    console.log('Creating checkout session for user:', session.user.id);
-    
     try {
+      console.log('Creating Stripe checkout session...');
+      
       // Create Stripe checkout session
       const checkoutSession = await stripe.checkout.sessions.create({
         mode: 'payment',
@@ -58,19 +72,38 @@ export async function POST() {
         },
       });
 
-      console.log('Checkout session created:', checkoutSession.id);
-      return NextResponse.json({ sessionId: checkoutSession.id });
+      console.log('Checkout session created successfully:', checkoutSession.id);
+      return NextResponse.json({ 
+        sessionId: checkoutSession.id,
+        url: checkoutSession.url 
+      });
     } catch (stripeError: any) {
-      console.error('Stripe error:', stripeError.message);
+      console.error('Stripe error:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+      });
+      
       return NextResponse.json(
-        { error: stripeError.message },
+        { 
+          error: 'Stripe error',
+          details: stripeError.message,
+          code: stripeError.code 
+        },
         { status: 500 }
       );
     }
   } catch (error: any) {
-    console.error('Server error:', error.message);
+    console.error('Server error:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error.message 
+      },
       { status: 500 }
     );
   }
