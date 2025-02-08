@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
 
 export default function ResumeUpload() {
   const [loading, setLoading] = useState(false)
@@ -12,21 +12,7 @@ export default function ResumeUpload() {
 
   useEffect(() => {
     console.log('ResumeUpload component mounted');
-    // Log initial state
     console.log('Initial files state:', files);
-
-    // Log component styles
-    const dropzone = document.querySelector('[data-testid="dropzone"]');
-    if (dropzone) {
-      const computedStyle = window.getComputedStyle(dropzone);
-      console.log('Dropzone styles:', {
-        border: computedStyle.border,
-        padding: computedStyle.padding,
-        backgroundColor: computedStyle.backgroundColor,
-      });
-    } else {
-      console.warn('Dropzone element not found');
-    }
   }, []);
 
   const onDrop = async (acceptedFiles: File[]) => {
@@ -35,7 +21,6 @@ export default function ResumeUpload() {
     try {
       const newFiles = { ...files }
       
-      // Determine which file is which based on name or let user specify
       acceptedFiles.forEach(file => {
         console.log('Processing file:', file.name);
         if (file.name.toLowerCase().includes('resume')) {
@@ -48,7 +33,6 @@ export default function ResumeUpload() {
       setFiles(newFiles)
       console.log('Updated files state:', newFiles);
 
-      // If we have both files, automatically submit
       if (newFiles.resume && newFiles.jobDescription) {
         await handleSubmit(newFiles)
       }
@@ -99,62 +83,99 @@ export default function ResumeUpload() {
     }
   }
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+    },
+    multiple: true
+  })
+
+  const removeFile = (type: 'resume' | 'jobDescription') => {
+    setFiles(prev => {
+      const newFiles = { ...prev }
+      delete newFiles[type]
+      return newFiles
+    })
+    setError(null)
+    setSuccess(false)
+  }
 
   return (
-    <div data-testid="dropzone" className="max-w-xl mx-auto p-6">
+    <div className="space-y-6">
+      {/* File Upload Area */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-500'
-        }`}
+        className={`
+          border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer
+          ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-500 hover:bg-gray-50'}
+        `}
+        data-testid="dropzone"
       >
         <input {...getInputProps()} />
-        
-        {loading ? (
-          <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-            <p className="mt-4 text-gray-600">Processing your files...</p>
-          </div>
-        ) : success ? (
-          <div className="flex flex-col items-center text-green-600">
-            <CheckCircle size={32} />
-            <p className="mt-4">Analysis complete!</p>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center text-red-600">
-            <AlertCircle size={32} />
-            <p className="mt-4">{error}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            <Upload size={32} className="text-gray-400" />
-            <p className="mt-4 text-gray-600">
-              {isDragActive
-                ? "Drop your files here..."
-                : "Drag and drop your resume and job description, or click to select files"}
-            </p>
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          {isDragActive ? 'Drop your files here' : 'Drag and drop your files'}
+        </h3>
+        <p className="text-gray-500">
+          or click to select files
+        </p>
+      </div>
+
+      {/* File List */}
+      <div className="space-y-3">
+        {files.resume && (
+          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <FileText className="h-5 w-5 text-blue-500" />
+              <span className="text-gray-700">{files.resume.name}</span>
+            </div>
+            <button
+              onClick={() => removeFile('resume')}
+              className="text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         )}
-
-        {/* File List */}
-        {(files.resume || files.jobDescription) && !success && !loading && (
-          <div className="mt-4 space-y-2">
-            {files.resume && (
-              <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                <FileText size={16} />
-                <span>{files.resume.name}</span>
-              </div>
-            )}
-            {files.jobDescription && (
-              <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                <FileText size={16} />
-                <span>{files.jobDescription.name}</span>
-              </div>
-            )}
+        {files.jobDescription && (
+          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <FileText className="h-5 w-5 text-green-500" />
+              <span className="text-gray-700">{files.jobDescription.name}</span>
+            </div>
+            <button
+              onClick={() => removeFile('jobDescription')}
+              className="text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         )}
       </div>
+
+      {/* Status Messages */}
+      {error && (
+        <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-lg">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="flex items-center space-x-2 text-green-600 bg-green-50 p-4 rounded-lg">
+          <CheckCircle className="h-5 w-5 flex-shrink-0" />
+          <p>Files processed successfully!</p>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      )}
     </div>
   )
 }
