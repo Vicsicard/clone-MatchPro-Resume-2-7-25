@@ -11,6 +11,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(new URL('/dashboard', request.url));
+  // Redirect to pricing page after sign in
+  return NextResponse.redirect(new URL('/pricing', request.url));
 }
