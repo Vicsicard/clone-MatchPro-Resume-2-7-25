@@ -6,29 +6,35 @@ import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 
+if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  throw new Error('Missing Stripe publishable key');
+}
+
 // Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export default function Pricing() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFreeTrial = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Call API to start free trial
       const response = await fetch('/api/start-trial', {
         method: 'POST',
       });
       
       if (!response.ok) {
-        throw new Error('Failed to start trial');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to start trial');
       }
       
       router.push('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting trial:', error);
-      alert('Failed to start trial. Please try again.');
+      setError(error.message || 'Failed to start trial. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -36,6 +42,7 @@ export default function Pricing() {
 
   const handlePaidPlan = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Create Stripe checkout session
       const response = await fetch('/api/create-checkout-session', {
@@ -43,7 +50,8 @@ export default function Pricing() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create checkout session');
       }
 
       const { sessionId } = await response.json();
@@ -59,9 +67,9 @@ export default function Pricing() {
       if (error) {
         throw error;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting checkout:', error);
-      alert('Failed to start checkout. Please try again.');
+      setError(error.message || 'Failed to start checkout. Please try again.');
       setLoading(false);
     }
   };
@@ -208,6 +216,12 @@ export default function Pricing() {
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="w-full max-w-md rounded-lg bg-red-600 p-4 text-white">
+            {error}
+          </div>
+        )}
       </main>
     </div>
   );
