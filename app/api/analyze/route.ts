@@ -1,5 +1,5 @@
+import { createServerSupabaseClient } from '../../supabase/client'
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/app/supabase/client'
 
 export async function POST(request: Request) {
   try {
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     
     if (!resume || !jobDescription) {
       return NextResponse.json(
-        { error: 'Missing required files' },
+        { error: 'Both resume and job description are required' },
         { status: 400 }
       )
     }
@@ -17,23 +17,33 @@ export async function POST(request: Request) {
     const supabase = createServerSupabaseClient()
     
     // Upload resume
-    const resumeBuffer = await resume.arrayBuffer()
+    const resumeBuffer = Buffer.from(await resume.arrayBuffer())
     const { data: resumeData, error: resumeError } = await supabase.storage
       .from('resumes')
       .upload(`${Date.now()}-${resume.name}`, resumeBuffer)
     
-    if (resumeError) throw resumeError
+    if (resumeError) {
+      return NextResponse.json(
+        { error: 'Failed to upload resume' },
+        { status: 500 }
+      )
+    }
 
     // Upload job description
-    const jobBuffer = await jobDescription.arrayBuffer()
+    const jobBuffer = Buffer.from(await jobDescription.arrayBuffer())
     const { data: jobData, error: jobError } = await supabase.storage
       .from('jobs')
       .upload(`${Date.now()}-${jobDescription.name}`, jobBuffer)
     
-    if (jobError) throw jobError
+    if (jobError) {
+      return NextResponse.json(
+        { error: 'Failed to upload job description' },
+        { status: 500 }
+      )
+    }
 
     // Create analysis record
-    const { data: analysis, error: dbError } = await supabase
+    const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .insert({
         resume_url: resumeData.path,
@@ -43,16 +53,22 @@ export async function POST(request: Request) {
       .select()
       .single()
     
-    if (dbError) throw dbError
+    if (analysisError) {
+      return NextResponse.json(
+        { error: 'Failed to create analysis record' },
+        { status: 500 }
+      )
+    }
 
-    return NextResponse.json({
-      status: 'success',
+    return NextResponse.json({ 
+      success: true,
       analysisId: analysis.id
     })
+
   } catch (error) {
-    console.error('Analysis error:', error)
+    console.error('Error processing files:', error)
     return NextResponse.json(
-      { error: error.message },
+      { error: 'Failed to process files' },
       { status: 500 }
     )
   }
