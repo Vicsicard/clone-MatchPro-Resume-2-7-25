@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/auth/sign-in', request.url));
   }
 
-  // For normal sign-ins, check subscription status
+  // For normal sign-ins, redirect to pricing
   try {
     const supabase = createServerSupabaseClient();
     
@@ -39,21 +39,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/auth/sign-in', request.url));
     }
 
-    // Check if user has an active subscription
-    const { data: subscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .eq('is_active', true)
-      .single();
-
-    // If no active subscription, redirect to pricing
-    if (!subscription) {
-      return NextResponse.redirect(new URL('/pricing', request.url));
-    }
-
-    // If they have an active subscription, redirect to dashboard
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Always redirect to pricing after successful authentication
+    return NextResponse.redirect(new URL('/pricing', request.url));
   } catch (error) {
     console.error('Error in auth callback:', error);
     return NextResponse.redirect(new URL('/auth/sign-in', request.url));
