@@ -3,26 +3,19 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { cookies } from 'next/headers';
 
-// Validate required environment variables
-const requiredEnvVars = {
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-};
-
-// Check for missing environment variables
-const missingEnvVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
-
-if (missingEnvVars.length > 0) {
-  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is required');
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia',
+if (!process.env.NEXT_PUBLIC_SITE_URL) {
+  throw new Error('NEXT_PUBLIC_SITE_URL is required');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16', // Use the latest stable version
 });
 
-const PRICE_ID = 'price_1QkpKCGEHfPiJwM4Wti4uP4V';
+const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH'; // Your actual price ID
 
 export async function POST() {
   try {
@@ -30,7 +23,6 @@ export async function POST() {
     
     const supabase = createServerSupabaseClient();
     
-    // Get the session and log the attempt
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
@@ -54,7 +46,6 @@ export async function POST() {
     try {
       console.log('Creating Stripe checkout session...');
       
-      // Create Stripe checkout session
       const checkoutSession = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
