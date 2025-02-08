@@ -4,21 +4,66 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function Pricing() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  const handleFreeTrial = () => {
+  const handleFreeTrial = async () => {
     setLoading(true);
-    // Add user to free trial and redirect to dashboard
-    router.push('/dashboard');
+    try {
+      // Call API to start free trial
+      const response = await fetch('/api/start-trial', {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to start trial');
+      }
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error starting trial:', error);
+      alert('Failed to start trial. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePaidPlan = () => {
+  const handlePaidPlan = async () => {
     setLoading(true);
-    // Will implement Stripe redirect here
-    router.push('/api/create-checkout-session');
+    try {
+      // Create Stripe checkout session
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const { sessionId } = await response.json();
+      
+      // Redirect to Stripe checkout
+      const stripe = await stripePromise;
+      if (!stripe) throw new Error('Stripe failed to load');
+
+      const { error } = await stripe.redirectToCheckout({
+        sessionId,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error starting checkout:', error);
+      alert('Failed to start checkout. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
