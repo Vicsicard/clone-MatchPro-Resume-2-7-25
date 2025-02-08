@@ -5,10 +5,7 @@ const nextConfig = {
   poweredByHeader: false,
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
-  },
-  experimental: {
-    optimizeCss: true,
-  },
+  }
 };
 
 module.exports = nextConfig;
