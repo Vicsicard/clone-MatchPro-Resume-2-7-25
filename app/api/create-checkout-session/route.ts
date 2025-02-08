@@ -12,7 +12,7 @@ if (!process.env.NEXT_PUBLIC_SITE_URL) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16', // Use the latest stable version
+  apiVersion: '2025-01-27.acacia',
 });
 
 const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH'; // Your actual price ID
