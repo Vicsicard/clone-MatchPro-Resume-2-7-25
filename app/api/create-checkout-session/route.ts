@@ -1,24 +1,26 @@
 import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { cookies } from 'next/headers';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is required');
-}
+// Initialize Stripe only when needed to avoid build issues
+const getStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY is required');
+  }
+  return new Stripe(secretKey, {
+    apiVersion: '2025-01-27.acacia',
+  });
+};
 
-if (!process.env.NEXT_PUBLIC_SITE_URL) {
-  throw new Error('NEXT_PUBLIC_SITE_URL is required');
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-01-27.acacia',
-});
-
-const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH'; // Your actual price ID
+const PRICE_ID = 'price_1OjRgZBrFwdXkFhbfHBQULkH';
 
 export async function POST() {
   try {
+    if (!process.env.NEXT_PUBLIC_SITE_URL) {
+      throw new Error('NEXT_PUBLIC_SITE_URL is required');
+    }
+
     console.log('Starting checkout session creation...');
     
     const supabase = createServerSupabaseClient();
@@ -44,6 +46,7 @@ export async function POST() {
     console.log('User authenticated:', session.user.id);
 
     try {
+      const stripe = getStripe();
       console.log('Creating Stripe checkout session...');
       
       const checkoutSession = await stripe.checkout.sessions.create({
