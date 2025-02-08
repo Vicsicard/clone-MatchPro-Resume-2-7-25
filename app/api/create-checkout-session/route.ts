@@ -29,8 +29,14 @@ const getSiteUrl = (request: Request): string => {
   return `${protocol}://${host}`;
 };
 
-// This is your price ID for the $19.99 subscription
-const PRICE_ID = 'price_1QkpKCGEHfPiJwM4Wti4uP4V';
+// Get price ID from environment
+const getPriceId = () => {
+  const priceId = process.env.STRIPE_PRICE_ID;
+  if (!priceId) {
+    throw new Error('STRIPE_PRICE_ID is required');
+  }
+  return priceId;
+};
 
 export async function POST(request: Request) {
   console.log('Starting checkout session creation...');
@@ -65,10 +71,13 @@ export async function POST(request: Request) {
       const stripe = getStripe();
       console.log('Creating Stripe checkout session...');
       
+      const priceId = getPriceId();
+      console.log('Using price ID:', priceId);
+
       // First verify that the price exists
       try {
-        console.log('Verifying price ID:', PRICE_ID);
-        const price = await stripe.prices.retrieve(PRICE_ID);
+        console.log('Verifying price ID:', priceId);
+        const price = await stripe.prices.retrieve(priceId);
         console.log('Price verified:', {
           id: price.id,
           active: price.active,
@@ -88,7 +97,7 @@ export async function POST(request: Request) {
         payment_method_types: ['card'],
         line_items: [
           {
-            price: PRICE_ID,
+            price: priceId,
             quantity: 1,
           },
         ],
