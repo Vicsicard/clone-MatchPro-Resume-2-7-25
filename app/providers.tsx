@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { logStyles, logStylesheets } from './debug';
+import ClientLayout from './client-layout';
 
 export function StyleDebugger() {
   useEffect(() => {
@@ -20,9 +21,9 @@ export function StyleDebugger() {
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <ClientLayout>
       <StyleDebugger />
       {children}
-    </>
+    </ClientLayout>
   );
 }
