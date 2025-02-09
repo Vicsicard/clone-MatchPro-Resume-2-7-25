@@ -14,6 +14,42 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<'pending' | 'completed' | 'failed' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+
+  // Poll for analysis status
+  useEffect(() => {
+    if (!analysisId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: analysis, error } = await supabase
+          .from('analyses')
+          .select('*')
+          .eq('id', analysisId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching analysis:', error);
+          return;
+        }
+
+        if (analysis) {
+          setAnalysisStatus(analysis.status);
+          setAnalysisResult(analysis.results);
+
+          if (analysis.status !== 'pending') {
+            clearInterval(pollInterval);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling analysis status:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [analysisId]);
   const router = useRouter();
   const supabase = createClient();
 
@@ -72,6 +108,8 @@ export default function Dashboard() {
       }
 
       setSuccess(true);
+      setAnalysisId(data.analysisId);
+      setAnalysisStatus('pending');
       setFiles({});
       console.log('Analysis started successfully:', data);
     } catch (error: any) {
@@ -186,11 +224,128 @@ export default function Dashboard() {
               )}
             </div>
             
-            {/* Recent Activity */}
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
-              <p className="text-gray-600">No recent activity to display.</p>
-            </div>
+            {/* Analysis Status */}
+            {analysisId && (
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Analysis Status</h2>
+                
+                {analysisStatus === 'pending' && (
+                  <div className="flex items-center space-x-3 text-blue-600">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent"></div>
+                    <p>Analysis in progress...</p>
+                  </div>
+                )}
+
+                {analysisStatus === 'completed' && analysisResult && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2 text-green-600">
+                      <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <p className="font-medium">Analysis completed</p>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      {/* Match Score */}
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Match Score</h3>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-3xl font-bold text-blue-600">
+                            {(analysisResult.score * 100).toFixed(1)}%
+                          </div>
+                          <div className="text-sm text-gray-500">match with job requirements</div>
+                        </div>
+                      </div>
+
+                      {/* Key Terms */}
+                      {analysisResult.keyTerms && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms Found</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {analysisResult.keyTerms.map((term: string, index: number) => (
+                              <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm">
+                                {term}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Skills Analysis */}
+                      {analysisResult.skills && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Skills Analysis</h3>
+                          <div className="space-y-2">
+                            {Object.entries(analysisResult.skills).map(([skill, present]: [string, any]) => (
+                              <div key={skill} className="flex items-center space-x-2">
+                                <span className={`w-2 h-2 rounded-full ${present ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                <span className="text-gray-700">{skill}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Recommendations */}
+                      {analysisResult.recommendations && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
+                          <ul className="list-disc list-inside space-y-2 text-gray-600">
+                            {analysisResult.recommendations.map((rec: string, index: number) => (
+                              <li key={index}>{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Experience Analysis */}
+                      {analysisResult.experience && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Experience Analysis</h3>
+                          <div className="prose prose-sm max-w-none text-gray-600">
+                            {analysisResult.experience}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Contact Information */}
+                      {analysisResult.contactInfo && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Contact Information Found</h3>
+                          <div className="space-y-2 text-gray-600">
+                            {Object.entries(analysisResult.contactInfo).map(([key, value]: [string, any]) => (
+                              <div key={key} className="flex items-start">
+                                <span className="font-medium w-24">{key}:</span>
+                                <span>{value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detailed Analysis */}
+                      {analysisResult.details && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Detailed Analysis</h3>
+                          <pre className="bg-gray-50 p-3 rounded text-sm text-gray-600 overflow-auto whitespace-pre-wrap">
+                            {analysisResult.details}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {analysisStatus === 'failed' && (
+                  <div className="flex items-center space-x-2 text-red-600">
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="font-medium">Analysis failed</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
