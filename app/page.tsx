@@ -41,17 +41,11 @@ export default function Home() {
                 MatchPro Resume
               </Link>
               <nav className="hidden md:flex space-x-8">
-                <Link href="/features" className="text-[15px] text-gray-600 hover:text-gray-900">
-                  Features
-                </Link>
                 <Link href="/pricing" className="text-[15px] text-gray-600 hover:text-gray-900">
                   Pricing
                 </Link>
                 <Link href="/blog" className="text-[15px] text-gray-600 hover:text-gray-900">
                   Blog
-                </Link>
-                <Link href="/about" className="text-[15px] text-gray-600 hover:text-gray-900">
-                  About
                 </Link>
               </nav>
             </div>
