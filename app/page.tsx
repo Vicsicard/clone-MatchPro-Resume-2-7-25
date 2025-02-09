@@ -47,6 +47,9 @@ export default function Home() {
                 <Link href="/pricing" className="text-[15px] text-gray-600 hover:text-gray-900">
                   Pricing
                 </Link>
+                <Link href="/blog" className="text-[15px] text-gray-600 hover:text-gray-900">
+                  Blog
+                </Link>
                 <Link href="/about" className="text-[15px] text-gray-600 hover:text-gray-900">
                   About
                 </Link>
