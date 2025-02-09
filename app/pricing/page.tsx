@@ -23,7 +23,21 @@ export default function Pricing() {
         throw new Error('Please sign in first');
       }
 
-      // Call our API route instead of direct database access
+      // Check if user already has an active subscription
+      const { data: existingSubscription } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .single();
+
+      // If user already has an active subscription, redirect to dashboard
+      if (existingSubscription) {
+        router.push('/dashboard');
+        return;
+      }
+
+      // Call our API route to create new subscription
       const response = await fetch('/api/start-trial', {
         method: 'POST',
         headers: {
