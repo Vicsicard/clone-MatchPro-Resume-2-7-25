@@ -122,28 +122,62 @@ export async function POST(request: Request) {
       console.log('Job description uploaded successfully:', jobData)
       uploadedFiles.push(`jobs/${jobPath}`)
 
-      // Create analysis record
-      console.log('Creating analysis record...')
-      const { data: analysis, error: analysisError } = await supabase
+      // Verify user session and access
+      console.log('Verifying user access...')
+      const { data: userCheck, error: userError } = await supabase
         .from('analyses')
-        .insert({
-          user_id: session.user.id,
-          resume_url: `resumes/${resumePath}`,
-          job_description_url: `jobs/${jobPath}`,
-          status: 'pending'
+        .select('id')
+        .limit(1)
+      
+      if (userError) {
+        console.error('Database access verification failed:', {
+          error: userError,
+          userId: session.user.id
         })
+        throw new Error('Database access verification failed')
+      }
+      
+      // Create analysis record with explicit schema match
+      console.log('Creating analysis record...')
+      const analysisData = {
+        user_id: session.user.id,
+        resume_url: `resumes/${resumePath}`,
+        job_description_url: `jobs/${jobPath}`,
+        status: 'pending',
+        results: null
+      }
+      
+      console.log('Attempting to insert analysis record:', analysisData)
+      
+      const { data: analysisResult, error: analysisError } = await supabase
+        .from('analyses')
+        .insert(analysisData)
         .select()
         .single()
       
       if (analysisError) {
-        console.error('Analysis creation error:', analysisError)
+        console.error('Analysis creation error:', {
+          error: analysisError,
+          errorMessage: analysisError.message,
+          errorDetails: analysisError.details,
+          data: analysisData,
+          userId: session.user.id
+        })
+        await cleanupFiles()
         throw new Error(`Failed to create analysis record: ${analysisError.message}`)
       }
-      console.log('Analysis record created:', analysis)
+      
+      if (!analysisResult) {
+        console.error('No analysis record created')
+        await cleanupFiles()
+        throw new Error('Failed to create analysis record: No record returned')
+      }
+      
+      console.log('Analysis record created:', analysisResult)
 
       return NextResponse.json({ 
         success: true,
-        analysisId: analysis.id,
+        analysisId: analysisResult.id,
         message: 'Files uploaded successfully. Analysis started.'
       })
 
