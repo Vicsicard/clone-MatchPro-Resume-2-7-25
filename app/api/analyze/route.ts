@@ -2,9 +2,10 @@ import { createServerSupabaseClient } from '../../supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
+  const supabase = createServerSupabaseClient()
+  let uploadedFiles: string[] = []
+
   try {
-    const supabase = createServerSupabaseClient()
-    
     // Check authentication
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
@@ -33,75 +34,91 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    
-    // Upload resume
-    const resumeBuffer = Buffer.from(await resume.arrayBuffer())
-    const { data: resumeData, error: resumeError } = await supabase.storage
-      .from('resumes')
-      .upload(`${session.user.id}/${Date.now()}-${resume.name}`, resumeBuffer)
-    
-    if (resumeError) {
-      console.error('Resume upload error:', resumeError)
+
+    // Check file types
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(resume.type) || !allowedTypes.includes(jobDescription.type)) {
       return NextResponse.json(
-        { error: 'Failed to upload resume' },
-        { status: 500 }
+        { error: 'Only PDF, DOC, and DOCX files are allowed' },
+        { status: 400 }
       )
     }
 
-    // Upload job description
-    const jobBuffer = Buffer.from(await jobDescription.arrayBuffer())
-    const { data: jobData, error: jobError } = await supabase.storage
-      .from('jobs')
-      .upload(`${session.user.id}/${Date.now()}-${jobDescription.name}`, jobBuffer)
+    // Function to handle file cleanup on error
+    const cleanupFiles = async () => {
+      if (uploadedFiles.length > 0) {
+        const promises = uploadedFiles.map(path => {
+          const [bucket, ...pathParts] = path.split('/')
+          return supabase.storage
+            .from(bucket)
+            .remove([pathParts.join('/')])
+        })
+        await Promise.all(promises)
+      }
+    }
     
-    if (jobError) {
-      console.error('Job description upload error:', jobError)
-      // If job upload fails, clean up the resume
-      await supabase.storage
+    try {
+      // Upload resume
+      const resumeBuffer = Buffer.from(await resume.arrayBuffer())
+      const resumePath = `resumes/${session.user.id}/${Date.now()}-${resume.name}`
+      const { error: resumeError } = await supabase.storage
         .from('resumes')
-        .remove([resumeData.path])
+        .upload(resumePath.split('/').slice(1).join('/'), resumeBuffer, {
+          contentType: resume.type,
+          upsert: false
+        })
       
-      return NextResponse.json(
-        { error: 'Failed to upload job description' },
-        { status: 500 }
-      )
-    }
+      if (resumeError) {
+        throw new Error(`Failed to upload resume: ${resumeError.message}`)
+      }
+      uploadedFiles.push(resumePath)
 
-    // Create analysis record
-    const { data: analysis, error: analysisError } = await supabase
-      .from('analyses')
-      .insert({
-        user_id: session.user.id,
-        resume_url: resumeData.path,
-        job_description_url: jobData.path,
-        status: 'pending'
+      // Upload job description
+      const jobBuffer = Buffer.from(await jobDescription.arrayBuffer())
+      const jobPath = `jobs/${session.user.id}/${Date.now()}-${jobDescription.name}`
+      const { error: jobError } = await supabase.storage
+        .from('jobs')
+        .upload(jobPath.split('/').slice(1).join('/'), jobBuffer, {
+          contentType: jobDescription.type,
+          upsert: false
+        })
+      
+      if (jobError) {
+        throw new Error(`Failed to upload job description: ${jobError.message}`)
+      }
+      uploadedFiles.push(jobPath)
+
+      // Create analysis record
+      const { data: analysis, error: analysisError } = await supabase
+        .from('analyses')
+        .insert({
+          user_id: session.user.id,
+          resume_url: resumePath,
+          job_description_url: jobPath,
+          status: 'pending'
+        })
+        .select()
+        .single()
+      
+      if (analysisError) {
+        throw new Error(`Failed to create analysis record: ${analysisError.message}`)
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        analysisId: analysis.id,
+        message: 'Files uploaded successfully. Analysis started.'
       })
-      .select()
-      .single()
-    
-    if (analysisError) {
-      console.error('Analysis creation error:', analysisError)
-      // Clean up uploaded files if analysis creation fails
-      await Promise.all([
-        supabase.storage.from('resumes').remove([resumeData.path]),
-        supabase.storage.from('jobs').remove([jobData.path])
-      ])
-      
-      return NextResponse.json(
-        { error: 'Failed to create analysis record' },
-        { status: 500 }
-      )
+
+    } catch (error: any) {
+      await cleanupFiles()
+      throw error
     }
 
-    return NextResponse.json({ 
-      success: true,
-      analysisId: analysis.id
-    })
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing files:', error)
     return NextResponse.json(
-      { error: 'Failed to process files' },
+      { error: error.message || 'Failed to process files' },
       { status: 500 }
     )
   }
