@@ -71,7 +71,9 @@ export async function POST(request: Request) {
       // Upload resume
       console.log('Converting resume to buffer...')
       const resumeBuffer = Buffer.from(await resume.arrayBuffer())
-      const resumePath = `${session.user.id}/${Date.now()}-${resume.name}`
+      // Sanitize filename by removing special characters and spaces
+      const sanitizedResumeName = resume.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const resumePath = `${session.user.id}/${Date.now()}-${sanitizedResumeName}`
       console.log('Uploading resume to path:', resumePath)
       
       const { data: resumeData, error: resumeError } = await supabase.storage
@@ -83,6 +85,11 @@ export async function POST(request: Request) {
       
       if (resumeError) {
         console.error('Resume upload error:', resumeError)
+        console.error('Resume details:', {
+          path: resumePath,
+          size: resume.size,
+          type: resume.type
+        })
         throw new Error(`Failed to upload resume: ${resumeError.message}`)
       }
       console.log('Resume uploaded successfully:', resumeData)
@@ -91,7 +98,9 @@ export async function POST(request: Request) {
       // Upload job description
       console.log('Converting job description to buffer...')
       const jobBuffer = Buffer.from(await jobDescription.arrayBuffer())
-      const jobPath = `${session.user.id}/${Date.now()}-${jobDescription.name}`
+      // Sanitize filename by removing special characters and spaces
+      const sanitizedJobName = jobDescription.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const jobPath = `${session.user.id}/${Date.now()}-${sanitizedJobName}`
       console.log('Uploading job description to path:', jobPath)
       
       const { data: jobData, error: jobError } = await supabase.storage
@@ -103,6 +112,11 @@ export async function POST(request: Request) {
       
       if (jobError) {
         console.error('Job description upload error:', jobError)
+        console.error('Job description details:', {
+          path: jobPath,
+          size: jobDescription.size,
+          type: jobDescription.type
+        })
         throw new Error(`Failed to upload job description: ${jobError.message}`)
       }
       console.log('Job description uploaded successfully:', jobData)
