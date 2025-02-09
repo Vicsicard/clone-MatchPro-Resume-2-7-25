@@ -1,10 +1,11 @@
 import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = createServerSupabaseClient();
     
+    // Get session
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -16,24 +17,45 @@ export async function POST() {
       );
     }
 
-    // Calculate trial end time (24 hours from now)
-    const trialEnd = new Date();
-    trialEnd.setHours(trialEnd.getHours() + 24);
+    // Check if user already has an active subscription
+    const { data: existingSubscription } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .single();
 
-    // Update user's metadata with trial information
+    if (existingSubscription) {
+      return NextResponse.json(
+        { error: 'User already has an active subscription' },
+        { status: 400 }
+      );
+    }
+
+    // Get subscription type from request body
+    const body = await request.json();
+    const subscriptionType = body.subscriptionType || 'free';
+
+    // Calculate end date based on subscription type
+    const endDate = new Date();
+    if (subscriptionType === 'trial' || subscriptionType === 'free') {
+      endDate.setDate(endDate.getDate() + 30); // 30 days trial/free period
+    }
+
+    // Insert new subscription
     const { error } = await supabase
       .from('user_subscriptions')
-      .upsert({
+      .insert({
         user_id: session.user.id,
-        subscription_type: 'trial',
-        trial_end: trialEnd.toISOString(),
+        subscription_type: subscriptionType,
+        trial_end: endDate.toISOString(),
         is_active: true
       });
 
     if (error) {
-      console.error('Error setting up trial:', error);
+      console.error('Error creating subscription:', error);
       return NextResponse.json(
-        { error: 'Failed to start trial' },
+        { error: 'Failed to create subscription' },
         { status: 500 }
       );
     }

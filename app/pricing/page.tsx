@@ -23,21 +23,21 @@ export default function Pricing() {
         throw new Error('Please sign in first');
       }
 
-      // Create a free trial subscription
-      const { error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .insert([
-          {
-            user_id: session.user.id,
-            subscription_type: 'trial',
-            is_active: true,
-            trial_start: new Date().toISOString(),
-            trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-          },
-        ]);
+      // Call our API route instead of direct database access
+      const response = await fetch('/api/start-trial', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriptionType: 'free'
+        }),
+      });
 
-      if (subscriptionError) {
-        throw subscriptionError;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start free trial');
       }
 
       router.push('/dashboard');
@@ -139,7 +139,7 @@ export default function Pricing() {
               <p className="mt-4 text-gray-500">Perfect for trying out our services</p>
               <p className="mt-8">
                 <span className="text-4xl font-extrabold text-gray-900">$0</span>
-                <span className="text-base font-medium text-gray-500">/7 days</span>
+                <span className="text-base font-medium text-gray-500">/30 days</span>
               </p>
               <button
                 onClick={handleFreeTrial}
