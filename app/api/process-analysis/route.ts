@@ -8,6 +8,7 @@ import os from 'os'
 export async function POST(request: Request) {
   const supabase = createServerSupabaseClient()
   let tempDir: string | null = null;
+  let analysisId: string | null = null;
   
   try {
     // Check authentication
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
     }
 
     // Get analysis ID from request
-    const { analysisId } = await request.json()
+    const requestData = await request.json()
+    analysisId = requestData.analysisId
     if (!analysisId) {
       return NextResponse.json({ error: 'Analysis ID is required' }, { status: 400 })
     }
