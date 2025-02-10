@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '../../supabase/server'
 import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import path from 'path'
+import fs from 'fs'
+import os from 'os'
 
 export async function POST(request: Request) {
   const supabase = createServerSupabaseClient()
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get analysis record
+    // Get analysis record and file contents
     const { data: analysis, error: fetchError } = await supabase
       .from('analyses')
       .select('*')
@@ -41,16 +43,52 @@ export async function POST(request: Request) {
       )
     }
 
-    // Run the Python analysis script with full analysis
+    // Download files from Supabase storage
+    const { data: resumeFile } = await supabase.storage
+      .from('resumes')
+      .download(analysis.resume_url.replace('resumes/', ''))
+
+    const { data: jobFile } = await supabase.storage
+      .from('jobs')
+      .download(analysis.job_description_url.replace('jobs/', ''))
+
+    if (!resumeFile || !jobFile) {
+      throw new Error('Failed to download files')
+    }
+
+    // Create temp directory for processing
+    const tempDir = path.join(os.tmpdir(), 'resume-analysis-' + Date.now())
+    await fs.promises.mkdir(tempDir, { recursive: true })
+    
+    const resumePath = path.join(tempDir, 'resume_' + Date.now() + '.pdf')
+    const jobPath = path.join(tempDir, 'job_' + Date.now() + '.pdf')
+    
+    // Convert Blobs to ArrayBuffer
+    const resumeBuffer = await resumeFile.arrayBuffer()
+    const jobBuffer = await jobFile.arrayBuffer()
+    
+    await fs.promises.writeFile(resumePath, Buffer.from(resumeBuffer))
+    await fs.promises.writeFile(jobPath, Buffer.from(jobBuffer))
+
+    // Update status to processing
+    await supabase
+      .from('analyses')
+      .update({ status: 'processing' })
+      .eq('id', analysisId)
+
+    // Execute Python analysis script
     const pythonProcess = spawn('python', [
       path.join(process.cwd(), 'resume_matcher', 'scripts', 'processor.py'),
-      '--resume', analysis.resume_url,
-      '--job-description', analysis.job_description_url,
-      '--extract-entities',
-      '--extract-keywords',
-      '--analyze-experience',
-      '--full-analysis'
-    ])
+      '--input-resume', resumePath,
+      '--input-job', jobPath,
+      '--mode', 'full',
+      '--format', 'json'
+    ], {
+      env: {
+        ...process.env,
+        PYTHONPATH: process.cwd()
+      }
+    })
 
     let result = ''
     let error = ''
@@ -61,12 +99,14 @@ export async function POST(request: Request) {
 
     pythonProcess.stderr.on('data', (data) => {
       error += data.toString()
+      console.error('Python process error:', data.toString())
     })
 
+    // Wait for Python process to complete
     await new Promise((resolve, reject) => {
       pythonProcess.on('close', (code) => {
         if (code !== 0) {
-          console.error('Python process error:', error)
+          console.error('Python process failed:', error)
           reject(new Error('Analysis failed'))
         } else {
           resolve(result)
@@ -74,52 +114,57 @@ export async function POST(request: Request) {
       })
     })
 
-    // Parse the comprehensive results
-    let analysisResults;
+    // Clean up temp directory
     try {
-      analysisResults = JSON.parse(result);
+      await fs.promises.rm(tempDir, { recursive: true, force: true })
+    } catch (e) {
+      console.error('Error cleaning up temp files:', e)
+    }
+
+    // Parse the analysis results
+    const analysisResult = result.trim()
+    
+    try {
+      // Parse the JSON output from Python script
+      const parsedResult = JSON.parse(analysisResult);
+      
+      // Check for error in Python result
+      if (parsedResult.error) {
+        throw new Error(`Python analysis failed: ${parsedResult.error}`);
+      }
+
+      // Update the analysis record with results
+      const { error: updateError } = await supabase
+        .from('analyses')
+        .update({
+          status: 'completed',
+          results: parsedResult
+        })
+        .eq('id', analysisId);
+
+      if (updateError) {
+        throw new Error('Failed to update analysis results');
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Analysis completed successfully',
+        results: parsedResult
+      });
     } catch (e) {
       console.error('Failed to parse analysis results:', e);
-      throw new Error('Invalid analysis results format');
+      // Update analysis status to failed
+      await supabase
+        .from('analyses')
+        .update({
+          status: 'failed',
+          results: {
+            error: e.message || 'Failed to parse analysis results'
+          }
+        })
+        .eq('id', analysisId);
+      throw new Error('Failed to process analysis results: ' + e.message);
     }
-
-    // Update the analysis record with comprehensive results
-    const { error: updateError } = await supabase
-      .from('analyses')
-      .update({
-        status: 'completed',
-        results: {
-          score: analysisResults.score,
-          keyTerms: analysisResults.extracted_keywords,
-          entities: analysisResults.extracted_entities,
-          experience: analysisResults.experience_analysis,
-          contactInfo: analysisResults.contact_information,
-          skills: analysisResults.skills_analysis,
-          recommendations: analysisResults.improvement_suggestions,
-          details: analysisResults.detailed_analysis
-        }
-      })
-      .eq('id', analysisId)
-
-    if (updateError) {
-      console.error('Error updating analysis:', updateError)
-      throw new Error('Failed to update analysis results')
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Analysis completed successfully',
-      score: analysisResults.score,
-      results: {
-        keyTerms: analysisResults.extracted_keywords,
-        entities: analysisResults.extracted_entities,
-        experience: analysisResults.experience_analysis,
-        contactInfo: analysisResults.contact_information,
-        skills: analysisResults.skills_analysis,
-        recommendations: analysisResults.improvement_suggestions,
-        details: analysisResults.detailed_analysis
-      }
-    })
 
   } catch (error: any) {
     console.error('Error processing analysis:', error)
