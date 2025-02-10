@@ -252,16 +252,34 @@ export default function Dashboard() {
                     </div>
                     
                     {/* Show progress updates */}
-                    {lastProgress.length > 0 && (
-                      <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700">
-                        <div className="font-medium mb-2">Progress:</div>
-                        <div className="space-y-1 pl-4">
-                          {lastProgress.map((progress, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <span>•</span>
-                              <span>{progress}</span>
-                            </div>
-                          ))}
+                    {analysisResult?.steps && (
+                      <div className="space-y-4">
+                        {/* Progress Bar */}
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${Math.min(
+                                (analysisResult.steps.length / 8) * 100, // 8 total steps
+                                100
+                              )}%` 
+                            }}
+                          ></div>
+                        </div>
+
+                        {/* Progress Steps */}
+                        <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700">
+                          <div className="font-medium mb-2">Analysis Progress:</div>
+                          <div className="space-y-2 pl-4">
+                            {analysisResult.steps.map((step: string, index: number) => (
+                              <div key={index} className="flex items-center space-x-2">
+                                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-medium">
+                                  {index + 1}
+                                </span>
+                                <span>{step}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

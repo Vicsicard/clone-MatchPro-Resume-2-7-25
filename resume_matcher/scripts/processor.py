@@ -36,16 +36,20 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
         Dictionary containing analysis results
     """
     try:
-        # Process resume and job description
-        print("Step 1/4: Processing resume...", file=sys.stderr)
+        # Step 1: Initialize
+        print("Step 1/8: Initializing analysis...", file=sys.stderr)
+        
+        # Step 2: Process resume
+        print("Step 2/8: Processing resume document...", file=sys.stderr)
         resume_processor = Processor(resume_path, "resume")
         resume_data = resume_processor.process()
-        print("Resume processed successfully", file=sys.stderr)
+        print("Resume document processed successfully", file=sys.stderr)
         
-        print("Step 2/4: Processing job description...", file=sys.stderr)
+        # Step 3: Process job description
+        print("Step 3/8: Processing job description document...", file=sys.stderr)
         job_processor = Processor(job_path, "job_description")
         job_data = job_processor.process()
-        print("Job description processed successfully", file=sys.stderr)
+        print("Job description document processed successfully", file=sys.stderr)
         
         if not resume_data or not job_data:
             raise Exception("Failed to process files")
@@ -64,11 +68,15 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
             elif not isinstance(job_keywords, list):
                 job_keywords = [str(job_keywords)]
             
-            print("Step 3/4: Calculating similarity score...", file=sys.stderr)
+            print("Step 4/8: Extracting keywords from documents...", file=sys.stderr)
             resume_string = " ".join(str(kw) for kw in resume_keywords)
             job_string = " ".join(str(kw) for kw in job_keywords)
             similarity_results = get_similarity_score(resume_string, job_string)
-            print("Similarity score calculated", file=sys.stderr)
+            print("Step 5/8: Generating document embeddings...", file=sys.stderr)
+            resume_string = " ".join(str(kw) for kw in resume_keywords)
+            job_string = " ".join(str(kw) for kw in job_keywords)
+            similarity_results = get_similarity_score(resume_string, job_string)
+            print("Step 6/8: Calculating similarity scores...", file=sys.stderr)
             
             # Calculate match score (take the first score if available)
             match_score = float(similarity_results[0]["score"]) if similarity_results else 0.0
@@ -144,7 +152,7 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
         for skill in matched_skills + technical_missing_skills:
             skills_analysis[skill] = skill in matched_skills
         
-        print("Step 4/4: Preparing final analysis...", file=sys.stderr)
+        print("Step 7/8: Analyzing skills and experience...", file=sys.stderr)
         # Prepare the final analysis result matching frontend expectations
         analysis_result = {
             "score": match_score,
@@ -164,6 +172,7 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
             }, indent=2)
         }
         
+        print("Step 8/8: Preparing final analysis report...", file=sys.stderr)
         return analysis_result
         
     except Exception as e:
