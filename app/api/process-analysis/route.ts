@@ -127,15 +127,20 @@ export async function POST(request: Request) {
       result += output
       
       // Update analysis status with progress
-      supabase
-        .from('analyses')
-        .update({ 
-          status: 'processing',
-          results: { progress: output }
-        })
-        .eq('id', analysisId)
-        .then(() => console.log('Updated analysis progress'))
-        .catch(err => console.error('Failed to update progress:', err))
+      (async () => {
+        try {
+          await supabase
+            .from('analyses')
+            .update({ 
+              status: 'processing',
+              results: { progress: output }
+            })
+            .eq('id', analysisId);
+          console.log('Updated analysis progress');
+        } catch (err) {
+          console.error('Failed to update progress:', err);
+        }
+      })();
     })
 
     pythonProcess.stderr.on('data', (data) => {
@@ -144,15 +149,20 @@ export async function POST(request: Request) {
       error += errorOutput
       
       // Update analysis status with error details
-      supabase
-        .from('analyses')
-        .update({ 
-          status: 'processing',
-          results: { error: errorOutput }
-        })
-        .eq('id', analysisId)
-        .then(() => console.log('Updated analysis with error details'))
-        .catch(err => console.error('Failed to update error details:', err))
+      (async () => {
+        try {
+          await supabase
+            .from('analyses')
+            .update({ 
+              status: 'processing',
+              results: { error: errorOutput }
+            })
+            .eq('id', analysisId);
+          console.log('Updated analysis with error details');
+        } catch (err) {
+          console.error('Failed to update error details:', err);
+        }
+      })();
     })
 
     // Log process events
