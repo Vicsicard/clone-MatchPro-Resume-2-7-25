@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from resume_matcher.scripts.parser import ParseDocumentToJson
 from resume_matcher.scripts.utils import read_single_pdf
 from scripts.similarity.get_similarity_score import get_similarity_score
@@ -36,11 +37,15 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
     """
     try:
         # Process resume and job description
+        print("Step 1/4: Processing resume...", file=sys.stderr)
         resume_processor = Processor(resume_path, "resume")
-        job_processor = Processor(job_path, "job_description")
-        
         resume_data = resume_processor.process()
+        print("Resume processed successfully", file=sys.stderr)
+        
+        print("Step 2/4: Processing job description...", file=sys.stderr)
+        job_processor = Processor(job_path, "job_description")
         job_data = job_processor.process()
+        print("Job description processed successfully", file=sys.stderr)
         
         if not resume_data or not job_data:
             raise Exception("Failed to process files")
@@ -59,10 +64,11 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
             elif not isinstance(job_keywords, list):
                 job_keywords = [str(job_keywords)]
             
-            # Get similarity score
+            print("Step 3/4: Calculating similarity score...", file=sys.stderr)
             resume_string = " ".join(str(kw) for kw in resume_keywords)
             job_string = " ".join(str(kw) for kw in job_keywords)
             similarity_results = get_similarity_score(resume_string, job_string)
+            print("Similarity score calculated", file=sys.stderr)
             
             # Calculate match score (take the first score if available)
             match_score = float(similarity_results[0]["score"]) if similarity_results else 0.0
@@ -138,6 +144,7 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
         for skill in matched_skills + technical_missing_skills:
             skills_analysis[skill] = skill in matched_skills
         
+        print("Step 4/4: Preparing final analysis...", file=sys.stderr)
         # Prepare the final analysis result matching frontend expectations
         analysis_result = {
             "score": match_score,

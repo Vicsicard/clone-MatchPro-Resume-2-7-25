@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 import cohere
 import yaml
 from qdrant_client import QdrantClient, models
@@ -15,6 +16,7 @@ stderr_handler, file_handler = get_handlers()
 class QdrantSearch:
     def __init__(self, resumes, jd):
         """Initialize QdrantSearch with resume and job description texts."""
+        print("Initializing similarity analysis...", file=sys.stderr)
         # Get API keys from environment variables
         self.cohere_key = os.getenv('COHERE_API_KEY')
         self.qdrant_key = os.getenv('QDRANT_API_KEY')
@@ -32,6 +34,7 @@ class QdrantSearch:
         
         # Initialize clients
         try:
+            print("Connecting to Cohere and Qdrant...", file=sys.stderr)
             self.cohere = cohere.Client(self.cohere_key)
             self.collection_name = "resume_collection_name"
             self.qdrant = QdrantClient(
@@ -45,7 +48,7 @@ class QdrantSearch:
             
             if not collection_exists:
                 vector_size = 4096
-                logger.info(f"Creating collection: {self.collection_name}")
+                print("Creating new vector collection...", file=sys.stderr)
                 self.qdrant.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=models.VectorParams(
@@ -54,7 +57,7 @@ class QdrantSearch:
                     ),
                 )
             else:
-                logger.info(f"Using existing collection: {self.collection_name}")
+                print("Resetting existing vector collection...", file=sys.stderr)
                 # Clear existing points
                 self.qdrant.delete_collection(self.collection_name)
                 self.qdrant.create_collection(
@@ -64,6 +67,7 @@ class QdrantSearch:
                         distance=models.Distance.COSINE
                     ),
                 )
+            print("Vector collection ready", file=sys.stderr)
         except Exception as e:
             logger.error(f"Failed to initialize clients: {str(e)}", exc_info=True)
             raise
@@ -71,9 +75,10 @@ class QdrantSearch:
     def get_embedding(self, text):
         """Get text embeddings using Cohere API."""
         try:
-            logger.info("Generating embeddings")
+            print("Generating embeddings using Cohere API...", file=sys.stderr)
             response = self.cohere.embed(texts=[text], model="large")
             embeddings = list(map(float, response.embeddings[0]))
+            print("Embeddings generated successfully", file=sys.stderr)
             return embeddings
         except Exception as e:
             logger.error(f"Error getting embeddings: {str(e)}", exc_info=True)
@@ -82,7 +87,7 @@ class QdrantSearch:
     def update_qdrant(self):
         """Update Qdrant collection with resume vectors."""
         try:
-            logger.info("Updating Qdrant collection")
+            print("Updating Qdrant collection with vectors...", file=sys.stderr)
             vectors = []
             ids = []
             for i, resume in enumerate(self.resumes):
@@ -98,7 +103,7 @@ class QdrantSearch:
                     payloads=[{"text": resume} for resume in self.resumes],
                 ),
             )
-            logger.info("Qdrant collection updated successfully")
+            print("Vectors uploaded to Qdrant successfully", file=sys.stderr)
         except Exception as e:
             logger.error(f"Error updating Qdrant collection: {str(e)}", exc_info=True)
             raise
@@ -106,7 +111,7 @@ class QdrantSearch:
     def search(self):
         """Search for similar resumes using job description."""
         try:
-            logger.info("Performing similarity search")
+            print("Performing similarity search in Qdrant...", file=sys.stderr)
             vector = self.get_embedding(self.jd)
             hits = self.qdrant.search(
                 collection_name=self.collection_name,
@@ -122,7 +127,7 @@ class QdrantSearch:
                 }
                 results.append(result)
             
-            logger.info(f"Search completed. Found {len(results)} matches")
+            print(f"Search completed. Found {len(results)} matches", file=sys.stderr)
             return results
         except Exception as e:
             logger.error(f"Error performing search: {str(e)}", exc_info=True)
@@ -131,7 +136,7 @@ class QdrantSearch:
 def get_similarity_score(resume_string, job_description_string):
     """Calculate similarity score between resume and job description."""
     try:
-        logger.info("Starting similarity analysis")
+        print("Starting similarity analysis...", file=sys.stderr)
         
         if not resume_string or not job_description_string:
             raise ValueError("Resume and job description strings cannot be empty")
@@ -140,7 +145,7 @@ def get_similarity_score(resume_string, job_description_string):
         qdrant_search.update_qdrant()
         search_result = qdrant_search.search()
         
-        logger.info("Similarity analysis completed successfully")
+        print("Similarity analysis completed successfully", file=sys.stderr)
         return search_result
         
     except Exception as e:

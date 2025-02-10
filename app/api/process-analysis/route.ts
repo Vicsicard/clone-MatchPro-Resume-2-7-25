@@ -121,49 +121,74 @@ export async function POST(request: Request) {
     let result = ''
     let error = ''
 
+    // Buffer for collecting complete JSON output
+    let jsonBuffer = '';
+    let progressBuffer = '';
+
     pythonProcess.stdout.on('data', (data) => {
-      const output = data.toString()
-      console.log('Python stdout:', output)
-      result += output
+      const output = data.toString();
+      console.log('Python stdout:', output);
       
-      // Update analysis status with progress
-      (async () => {
-        try {
-          await supabase
-            .from('analyses')
-            .update({ 
-              status: 'processing',
-              results: { progress: output }
-            })
-            .eq('id', analysisId);
-          console.log('Updated analysis progress');
-        } catch (err) {
-          console.error('Failed to update progress:', err);
+      // Attempt to parse as JSON first (final result)
+      try {
+        const jsonStart = output.indexOf('{');
+        if (jsonStart !== -1) {
+          jsonBuffer += output;
+          // Try parsing to see if we have complete JSON
+          JSON.parse(jsonBuffer);
+          result = jsonBuffer;
+        } else {
+          // If not JSON, treat as progress update
+          progressBuffer += output;
+          // Update analysis status with progress
+          (async () => {
+            try {
+              await supabase
+                .from('analyses')
+                .update({ 
+                  status: 'processing',
+                  results: { progress: progressBuffer }
+                })
+                .eq('id', analysisId);
+              console.log('Updated analysis progress');
+            } catch (err) {
+              console.error('Failed to update progress:', err);
+            }
+          })();
         }
-      })();
-    })
+      } catch (e) {
+        // Incomplete JSON, continue buffering
+        if (jsonBuffer) {
+          jsonBuffer += output;
+        }
+      }
+    });
 
     pythonProcess.stderr.on('data', (data) => {
-      const errorOutput = data.toString()
-      console.error('Python stderr:', errorOutput)
-      error += errorOutput
+      const errorOutput = data.toString();
+      console.error('Python stderr:', errorOutput);
+      error += errorOutput;
       
-      // Update analysis status with error details
-      (async () => {
-        try {
-          await supabase
-            .from('analyses')
-            .update({ 
-              status: 'processing',
-              results: { error: errorOutput }
-            })
-            .eq('id', analysisId);
-          console.log('Updated analysis with error details');
-        } catch (err) {
-          console.error('Failed to update error details:', err);
-        }
-      })();
-    })
+      // Only update with stderr if it's not a progress message
+      if (!errorOutput.includes('Starting resume analysis...') && 
+          !errorOutput.includes('Files verified') &&
+          !errorOutput.includes('Processing completed')) {
+        (async () => {
+          try {
+            await supabase
+              .from('analyses')
+              .update({ 
+                status: 'processing',
+                results: { error: errorOutput }
+              })
+              .eq('id', analysisId);
+            console.log('Updated analysis with error details');
+          } catch (err) {
+            console.error('Failed to update error details:', err);
+          }
+        })();
+      }
+    });
 
     // Log process events
     pythonProcess.on('spawn', () => {
