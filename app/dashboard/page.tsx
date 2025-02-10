@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [lastProgress, setLastProgress] = useState<string[]>([]);
 
   // Poll for analysis status
   useEffect(() => {
@@ -37,6 +38,18 @@ export default function Dashboard() {
 
         if (analysis) {
           setAnalysisStatus(analysis.status);
+          
+          // Handle progress updates
+          if (analysis.results?.progress) {
+            setLastProgress(prev => {
+              const newProgress = [...prev];
+              if (!prev.includes(analysis.results.progress)) {
+                newProgress.push(analysis.results.progress);
+              }
+              return newProgress;
+            });
+          }
+          
           setAnalysisResult(analysis.results);
 
           if (analysis.status !== 'pending' && analysis.status !== 'processing') {
@@ -46,10 +59,11 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Error polling analysis status:', error);
       }
-    }, 5000); // Poll every 5 seconds
+    }, 1000); // Poll every second for more responsive updates
 
     return () => clearInterval(pollInterval);
   }, [analysisId]);
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -84,6 +98,7 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    setLastProgress([]);
 
     try {
       console.log('Starting analysis with files:', {
@@ -233,13 +248,21 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     <div className="flex items-center space-x-3 text-blue-600">
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent"></div>
-                      <p>Analysis in progress...</p>
+                      <p>{analysisStatus === 'pending' ? 'Starting analysis...' : 'Analysis in progress...'}</p>
                     </div>
                     
                     {/* Show progress updates */}
-                    {analysisResult?.progress && (
-                      <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
-                        {analysisResult.progress}
+                    {lastProgress.length > 0 && (
+                      <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700">
+                        <div className="font-medium mb-2">Progress:</div>
+                        <div className="space-y-1 pl-4">
+                          {lastProgress.map((progress, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <span>•</span>
+                              <span>{progress}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     
