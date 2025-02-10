@@ -125,12 +125,34 @@ export async function POST(request: Request) {
       const output = data.toString()
       console.log('Python stdout:', output)
       result += output
+      
+      // Update analysis status with progress
+      supabase
+        .from('analyses')
+        .update({ 
+          status: 'processing',
+          results: { progress: output }
+        })
+        .eq('id', analysisId)
+        .then(() => console.log('Updated analysis progress'))
+        .catch(err => console.error('Failed to update progress:', err))
     })
 
     pythonProcess.stderr.on('data', (data) => {
       const errorOutput = data.toString()
       console.error('Python stderr:', errorOutput)
       error += errorOutput
+      
+      // Update analysis status with error details
+      supabase
+        .from('analyses')
+        .update({ 
+          status: 'processing',
+          results: { error: errorOutput }
+        })
+        .eq('id', analysisId)
+        .then(() => console.log('Updated analysis with error details'))
+        .catch(err => console.error('Failed to update error details:', err))
     })
 
     // Log process events
@@ -144,10 +166,16 @@ export async function POST(request: Request) {
 
     // Wait for Python process to complete
     await new Promise((resolve, reject) => {
+      let timeout = setTimeout(() => {
+        pythonProcess.kill()
+        reject(new Error('Analysis timed out after 60 seconds'))
+      }, 60000) // 60 second timeout
+      
       pythonProcess.on('close', (code) => {
+        clearTimeout(timeout)
         if (code !== 0) {
           console.error('Python process failed:', error)
-          reject(new Error('Analysis failed'))
+          reject(new Error(`Analysis failed with code ${code}: ${error}`))
         } else {
           resolve(result)
         }

@@ -39,16 +39,31 @@ class QdrantSearch:
                 api_key=self.qdrant_key,
             )
 
-            # Initialize collection
-            vector_size = 4096
-            logger.info(f"Initializing collection: {self.collection_name}")
-            self.qdrant.recreate_collection(
-                collection_name=self.collection_name,
-                vectors_config=models.VectorParams(
-                    size=vector_size, 
-                    distance=models.Distance.COSINE
-                ),
-            )
+            # Check if collection exists, create only if it doesn't
+            collections = self.qdrant.get_collections()
+            collection_exists = any(col.name == self.collection_name for col in collections.collections)
+            
+            if not collection_exists:
+                vector_size = 4096
+                logger.info(f"Creating collection: {self.collection_name}")
+                self.qdrant.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=models.VectorParams(
+                        size=vector_size, 
+                        distance=models.Distance.COSINE
+                    ),
+                )
+            else:
+                logger.info(f"Using existing collection: {self.collection_name}")
+                # Clear existing points
+                self.qdrant.delete_collection(self.collection_name)
+                self.qdrant.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=models.VectorParams(
+                        size=vector_size, 
+                        distance=models.Distance.COSINE
+                    ),
+                )
         except Exception as e:
             logger.error(f"Failed to initialize clients: {str(e)}", exc_info=True)
             raise
