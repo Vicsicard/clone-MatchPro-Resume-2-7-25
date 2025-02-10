@@ -73,7 +73,7 @@ create table if not exists public.analyses (
   user_id uuid references auth.users(id) on delete cascade not null,
   resume_url text not null,
   job_description_url text not null,
-  status text not null check (status in ('pending', 'completed', 'failed')),
+  status text not null check (status in ('pending', 'processing', 'completed', 'failed')),
   results jsonb,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
