@@ -1,13 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useDropzone } from 'react-dropzone'
+import { useDropzone, Accept } from 'react-dropzone'
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
 
 interface ResumeUploadProps {
   onFileSelect: (file: File) => void
   accept: string
   file?: File
+}
+
+const acceptedFileTypes: Accept = {
+  'application/pdf': ['.pdf'],
+  'application/msword': ['.doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
 }
 
 export default function ResumeUpload({ onFileSelect, accept, file: existingFile }: ResumeUploadProps) {
@@ -29,7 +35,7 @@ export default function ResumeUpload({ onFileSelect, accept, file: existingFile 
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept,
+    accept: acceptedFileTypes,
     multiple: false
   })
 
