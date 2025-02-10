@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         message: 'Analysis completed successfully',
         results: parsedResult
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to parse analysis results:', e);
       // Update analysis status to failed
       await supabase
@@ -159,11 +159,11 @@ export async function POST(request: Request) {
         .update({
           status: 'failed',
           results: {
-            error: e.message || 'Failed to parse analysis results'
+            error: e?.message || 'Failed to parse analysis results'
           }
         })
         .eq('id', analysisId);
-      throw new Error('Failed to process analysis results: ' + e.message);
+      throw new Error('Failed to process analysis results: ' + (e?.message || 'Unknown error'));
     }
 
   } catch (error: any) {
