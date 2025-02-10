@@ -175,6 +175,22 @@ export async function POST(request: Request) {
       
       console.log('Analysis record created:', analysisResult)
 
+      // Trigger analysis process
+      console.log('Triggering analysis process...')
+      const analysisResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisId: analysisResult.id
+        })
+      })
+
+      if (!analysisResponse.ok) {
+        console.error('Failed to start analysis process:', await analysisResponse.text())
+      }
+
       return NextResponse.json({ 
         success: true,
         analysisId: analysisResult.id,

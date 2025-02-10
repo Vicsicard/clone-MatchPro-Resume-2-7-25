@@ -20,7 +20,7 @@ PyYAML>=6.0.1
 
 # Vector similarity and embeddings
 qdrant-client>=1.1.1
-cohere-python>=4.5.1
+cohere>=4.5.1
 
 # Add comment to install spaCy model separately:
 # After installing requirements, run:
