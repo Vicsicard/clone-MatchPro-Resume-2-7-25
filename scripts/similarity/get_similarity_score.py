@@ -57,8 +57,9 @@ class QdrantSearch:
         """Get text embeddings using Cohere API."""
         try:
             logger.info("Generating embeddings")
-            embeddings = self.cohere.embed([text], "large").embeddings
-            return list(map(float, embeddings[0])), len(embeddings[0])
+            response = self.cohere.embed(texts=[text], model="large")
+            embeddings = list(map(float, response.embeddings[0]))
+            return embeddings
         except Exception as e:
             logger.error(f"Error getting embeddings: {str(e)}", exc_info=True)
             raise
@@ -70,7 +71,7 @@ class QdrantSearch:
             vectors = []
             ids = []
             for i, resume in enumerate(self.resumes):
-                vector, size = self.get_embedding(resume)
+                vector = self.get_embedding(resume)
                 vectors.append(vector)
                 ids.append(i)
             
@@ -91,7 +92,7 @@ class QdrantSearch:
         """Search for similar resumes using job description."""
         try:
             logger.info("Performing similarity search")
-            vector, _ = self.get_embedding(self.jd)
+            vector = self.get_embedding(self.jd)
             hits = self.qdrant.search(
                 collection_name=self.collection_name,
                 query_vector=vector,

@@ -45,17 +45,40 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
         if not resume_data or not job_data:
             raise Exception("Failed to process files")
 
-        # Extract keywords for similarity scoring
-        resume_keywords = resume_data.get("extracted_keywords", [])
-        job_keywords = job_data.get("extracted_keywords", [])
-        
-        # Get similarity score
-        resume_string = " ".join(resume_keywords)
-        job_string = " ".join(job_keywords)
-        similarity_results = get_similarity_score(resume_string, job_string)
-        
-        # Calculate match score (take the first score if available)
-        match_score = similarity_results[0]["score"] if similarity_results else 0.0
+        try:
+            # Extract keywords for similarity scoring
+            resume_keywords = resume_data.get("extracted_keywords", [])
+            if isinstance(resume_keywords, tuple):
+                resume_keywords = list(resume_keywords)
+            elif not isinstance(resume_keywords, list):
+                resume_keywords = [str(resume_keywords)]
+
+            job_keywords = job_data.get("extracted_keywords", [])
+            if isinstance(job_keywords, tuple):
+                job_keywords = list(job_keywords)
+            elif not isinstance(job_keywords, list):
+                job_keywords = [str(job_keywords)]
+            
+            # Get similarity score
+            resume_string = " ".join(str(kw) for kw in resume_keywords)
+            job_string = " ".join(str(kw) for kw in job_keywords)
+            similarity_results = get_similarity_score(resume_string, job_string)
+            
+            # Calculate match score (take the first score if available)
+            match_score = float(similarity_results[0]["score"]) if similarity_results else 0.0
+            
+            # Extract text from similarity results for skills comparison
+            resume_text = similarity_results[0]["text"] if similarity_results else ""
+            
+            # Clean up keywords
+            resume_keywords = [kw.strip() for kw in resume_keywords if isinstance(kw, (str, int, float))]
+            job_keywords = list(set(kw.strip() for kw in job_keywords if isinstance(kw, (str, int, float))))
+        except Exception as e:
+            print(f"Error processing keywords: {str(e)}")
+            resume_keywords = []
+            job_keywords = []
+            match_score = 0.0
+            resume_text = ""
         
         # Extract key information
         skills = resume_data.get("keyterms", [])
@@ -66,7 +89,15 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
             "phone": resume_data.get("phones", [])
         }
         
-        # Generate recommendations based on match score
+        # Clean up skills list
+        if isinstance(skills, (list, tuple)):
+            skills = [str(skill).split('(')[0].strip() for skill in skills]
+            # Remove any empty strings or very short skills
+            skills = [skill for skill in skills if len(skill) > 2]
+        else:
+            skills = []
+            
+        # Generate recommendations based on match score and analysis
         recommendations = []
         if match_score < 0.6:
             recommendations.append("Consider adding more relevant keywords from the job description")
@@ -74,23 +105,56 @@ def process_files(resume_path: str, job_path: str, mode: str = 'full', output_fo
             recommendations.append("Add a clear skills section to your resume")
         if not experience:
             recommendations.append("Include detailed work experience")
+        
+        # Define technical keywords to focus on
+        technical_keywords = {
+            'javascript', 'react', 'vue', 'angular', 'html', 'css', 'git', 
+            'jquery', 'frontend', 'backend', 'fullstack', 'api', 'rest',
+            'web', 'development', 'programming', 'software', 'engineering',
+            'computer science', 'database', 'testing', 'ci/cd', 'agile'
+        }
+        
+        # Add specific skill recommendations
+        missing_skills = [str(skill) for skill in job_keywords 
+                         if str(skill).lower() not in resume_text.lower() 
+                         and len(str(skill)) > 2  # Filter out short words
+                         and not str(skill).lower() in ['the', 'and', 'for', 'with', 'job', 'description', '•']  # Filter common words
+                         and not any(char in '•' for char in skill)]  # Remove bullet points
+        # Filter for technical skills
+        technical_missing_skills = [skill for skill in missing_skills 
+                                  if any(tech.lower() in skill.lower() for tech in technical_keywords)]
+        
+        if technical_missing_skills:
+            recommendations.append(f"Consider adding these technical skills: {', '.join(technical_missing_skills[:5])}")
             
-        # Prepare the final analysis result
+        # Format skills for frontend display
+        matched_skills = [skill for skill in skills 
+                         if any(str(job_skill).lower() in str(skill).lower() 
+                               for job_skill in job_keywords)
+                         and len(skill.strip()) > 2]
+        
+        # Create skills object for frontend
+        skills_analysis = {}
+        for skill in matched_skills + technical_missing_skills:
+            skills_analysis[skill] = skill in matched_skills
+        
+        # Prepare the final analysis result matching frontend expectations
         analysis_result = {
-            "match_score": match_score,
-            "key_terms": skills,
-            "skills_analysis": {
-                "matched_skills": [skill for skill in skills if any(job_skill in skill.lower() for job_skill in job_keywords)],
-                "missing_skills": [skill for skill in job_keywords if not any(resume_skill in skill.lower() for resume_skill in resume_keywords)]
+            "score": match_score,
+            "keyTerms": skills,
+            "skills": skills_analysis,
+            "experience": experience,
+            "contactInfo": {
+                "name": contact_info["name"][0] if contact_info["name"] else "",
+                "email": contact_info["email"][0] if contact_info["email"] else "",
+                "phone": contact_info["phone"][0] if contact_info["phone"] else ""
             },
-            "experience_analysis": experience,
-            "contact_information": contact_info,
             "recommendations": recommendations,
-            "details": {
-                "resume_keywords": resume_keywords,
-                "job_keywords": job_keywords,
-                "similarity_details": similarity_results
-            }
+            "details": json.dumps({
+                "resumeKeywords": resume_keywords,
+                "jobKeywords": job_keywords,
+                "similarityDetails": similarity_results
+            }, indent=2)
         }
         
         return analysis_result
