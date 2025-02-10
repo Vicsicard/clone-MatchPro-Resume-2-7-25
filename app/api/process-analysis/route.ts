@@ -76,17 +76,45 @@ export async function POST(request: Request) {
       .update({ status: 'processing' })
       .eq('id', analysisId)
 
-    // Execute Python analysis script
-    const pythonProcess = spawn('python', [
-      path.join(process.cwd(), 'resume_matcher', 'scripts', 'processor.py'),
+    // Log Python execution details
+    const scriptPath = path.join(process.cwd(), 'resume_matcher', 'scripts', '__main__.py')
+    const pythonArgs = [
+      scriptPath,
       '--input-resume', resumePath,
       '--input-job', jobPath,
       '--mode', 'full',
       '--format', 'json'
-    ], {
+    ]
+    
+    console.log('Executing Python script with:', {
+      scriptPath,
+      args: pythonArgs,
+      cwd: process.cwd(),
+      pythonPath: process.env.PYTHON_PATH || 'python'
+    })
+
+    // Verify required environment variables
+    const requiredEnvVars = {
+      COHERE_API_KEY: process.env.COHERE_API_KEY,
+      QDRANT_API_KEY: process.env.QDRANT_API_KEY,
+      QDRANT_URL: process.env.QDRANT_URL
+    }
+
+    for (const [key, value] of Object.entries(requiredEnvVars)) {
+      if (!value) {
+        console.error(`Missing required environment variable: ${key}`)
+        throw new Error(`Configuration error: ${key} is not set`)
+      }
+    }
+
+    // Execute Python analysis script with required environment variables
+    const pythonProcess = spawn(process.env.PYTHON_PATH || 'python', pythonArgs, {
       env: {
         ...process.env,
-        PYTHONPATH: process.cwd()
+        PYTHONPATH: process.cwd(),
+        COHERE_API_KEY: process.env.COHERE_API_KEY,
+        QDRANT_API_KEY: process.env.QDRANT_API_KEY,
+        QDRANT_URL: process.env.QDRANT_URL
       }
     })
 
@@ -94,12 +122,24 @@ export async function POST(request: Request) {
     let error = ''
 
     pythonProcess.stdout.on('data', (data) => {
-      result += data.toString()
+      const output = data.toString()
+      console.log('Python stdout:', output)
+      result += output
     })
 
     pythonProcess.stderr.on('data', (data) => {
-      error += data.toString()
-      console.error('Python process error:', data.toString())
+      const errorOutput = data.toString()
+      console.error('Python stderr:', errorOutput)
+      error += errorOutput
+    })
+
+    // Log process events
+    pythonProcess.on('spawn', () => {
+      console.log('Python process spawned')
+    })
+
+    pythonProcess.on('error', (err) => {
+      console.error('Failed to start Python process:', err)
     })
 
     // Wait for Python process to complete
