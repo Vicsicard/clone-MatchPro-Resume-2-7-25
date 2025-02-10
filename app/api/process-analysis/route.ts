@@ -126,8 +126,9 @@ export async function POST(request: Request) {
         results: analysisResult
       })
 
-    } catch (e) {
-      throw new Error(`Failed to parse analysis results: ${e.message}`)
+    } catch (e: Error | unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to parse analysis results'
+      throw new Error(`Failed to parse analysis results: ${errorMessage}`)
     }
 
   } catch (error: any) {
