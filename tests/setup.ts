@@ -17,8 +17,11 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// Set up test environment
-process.env.NODE_ENV = 'test';
+// Set environment variables for testing, but don't modify NODE_ENV directly
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+process.env.COHERE_API_KEY = 'test-cohere-key';
 
 // Export environment variables for TypeScript
 declare global {

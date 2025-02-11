@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+type FormDataFile = File | Blob;
+
 export async function POST(request: Request) {
   console.log('Starting analysis request...');
 
@@ -34,8 +36,8 @@ export async function POST(request: Request) {
     console.log('Form data keys:', Array.from(formData.keys()));
 
     // Get files and user ID
-    const resume = formData.get('resume');
-    const jobDescription = formData.get('jobDescription');
+    const resume = formData.get('resume') as FormDataFile | null;
+    const jobDescription = formData.get('jobDescription') as FormDataFile | null;
     const userId = formData.get('userId');
 
     if (!resume || !jobDescription || !userId) {
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
     let resumeText = '';
     let jobDescriptionText = '';
 
-    if (resume instanceof File || resume instanceof Blob) {
+    if (resume instanceof Blob) {
       resumeText = await resume.text();
     } else {
       console.error('Invalid resume type:', typeof resume);
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (jobDescription instanceof File || jobDescription instanceof Blob) {
+    if (jobDescription instanceof Blob) {
       jobDescriptionText = await jobDescription.text();
     } else {
       console.error('Invalid job description type:', typeof jobDescription);
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     // Get user ID as string
-    const userIdString = userId instanceof File || userId instanceof Blob ? 
+    const userIdString = userId instanceof Blob ? 
       await userId.text() : 
       String(userId);
 

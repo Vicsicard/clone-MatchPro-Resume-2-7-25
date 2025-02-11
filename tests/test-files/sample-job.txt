@@ -1,0 +1,26 @@
+Senior Software Engineer
+
+We are seeking a talented Senior Software Engineer to join our growing team. The ideal candidate will have strong experience in modern web development technologies and a passion for building scalable applications.
+
+Requirements:
+- 5+ years of experience in software development
+- Strong proficiency in JavaScript/TypeScript and modern frameworks
+- Experience with Node.js and microservices architecture
+- Knowledge of cloud platforms (AWS/Azure/GCP)
+- Experience with CI/CD and DevOps practices
+
+Responsibilities:
+- Design and implement scalable backend services
+- Lead development of frontend applications using React
+- Mentor junior developers and conduct code reviews
+- Collaborate with product and design teams
+- Participate in architectural decisions
+
+Benefits:
+- Competitive salary
+- Health insurance
+- Remote work options
+- Professional development budget
+- Stock options
+
+Location: Remote (US-based)

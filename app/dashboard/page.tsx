@@ -16,6 +16,10 @@ export default function Dashboard() {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
+  const router = useRouter();
+  const supabase = createClient();
 
   // Poll for analysis status
   useEffect(() => {
@@ -31,27 +35,33 @@ export default function Dashboard() {
 
         if (error) {
           console.error('Error fetching analysis:', error);
+          setError('Failed to fetch analysis status');
+          clearInterval(pollInterval);
           return;
         }
 
         if (analysis) {
           setAnalysisStatus(analysis.status);
-          setAnalysisResult(analysis.results);
+          if (analysis.results) {
+            setAnalysisResult(analysis.results);
+          }
 
           if (analysis.status === 'completed' || analysis.status === 'failed') {
             clearInterval(pollInterval);
+            if (analysis.status === 'failed') {
+              setError('Analysis failed. Please try again.');
+            }
           }
         }
       } catch (error) {
         console.error('Error polling analysis status:', error);
+        setError('Failed to check analysis status');
+        clearInterval(pollInterval);
       }
     }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(pollInterval);
   }, [analysisId]);
-
-  const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -72,6 +82,9 @@ export default function Dashboard() {
       [type]: file
     }));
     setError(null);
+    setAnalysisId(null);
+    setAnalysisStatus(null);
+    setAnalysisResult(null);
   };
 
   const handleAnalysis = async () => {
@@ -82,16 +95,25 @@ export default function Dashboard() {
 
     setLoading(true);
     setError(null);
+    setUploadProgress(0);
 
     try {
       const formData = new FormData();
       formData.append('resume', files.resume);
       formData.append('jobDescription', files.jobDescription);
 
+      // Create a timeout to handle hanging requests
+      const timeoutId = setTimeout(() => {
+        setError('Request timed out. Please try again.');
+        setLoading(false);
+      }, 30000); // 30 second timeout
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -100,9 +122,14 @@ export default function Dashboard() {
       }
 
       setAnalysisId(data.analysisId);
+      setAnalysisStatus('processing');
       setFiles({});
+      setUploadProgress(100);
     } catch (error: any) {
+      console.error('Analysis error:', error);
       setError(error.message || 'Failed to analyze files');
+      setAnalysisId(null);
+      setAnalysisStatus(null);
     } finally {
       setLoading(false);
     }
@@ -132,6 +159,7 @@ export default function Dashboard() {
                   onFileSelect={(file) => handleFileUpload('resume', file)}
                   accept=".pdf,.doc,.docx"
                   file={files.resume}
+                  disabled={loading}
                 />
               </div>
 
@@ -142,6 +170,7 @@ export default function Dashboard() {
                   onFileSelect={(file) => handleFileUpload('jobDescription', file)}
                   accept=".pdf,.doc,.docx"
                   file={files.jobDescription}
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -162,6 +191,30 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Upload Progress */}
+            {loading && (
+              <div className="relative pt-1">
+                <div className="flex mb-2 items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                      Progress
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-semibold inline-block text-blue-600">
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+                  <div
+                    style={{ width: `${uploadProgress}%` }}
+                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 transition-all duration-500"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Submit Button */}
             <div className="flex justify-center">
               <button
@@ -173,7 +226,7 @@ export default function Dashboard() {
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
-                {loading ? 'Analyzing...' : 'Start Analysis'}
+                {loading ? 'Processing...' : 'Start Analysis'}
               </button>
             </div>
           </div>
@@ -184,7 +237,7 @@ export default function Dashboard() {
               {/* Status */}
               <div className="bg-white p-6 rounded-lg border border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Analysis Status</h2>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2" data-testid="analysis-status">
                   {analysisStatus === 'processing' && (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
@@ -204,62 +257,19 @@ export default function Dashboard() {
                       <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      <p className="text-red-600">Analysis failed: {analysisResult?.error}</p>
+                      <p className="text-red-600">Analysis failed. Please try again.</p>
                     </>
                   )}
                 </div>
               </div>
 
               {/* Results */}
-              {analysisStatus === 'completed' && analysisResult && (
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
+              {analysisResult && (
+                <div className="bg-white p-6 rounded-lg border border-gray-200" data-testid="analysis-results">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Analysis Results</h2>
-                  
-                  {/* Match Score */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">Match Score</h3>
-                    <div className="mt-2 flex items-center">
-                      <div className="flex-1 bg-gray-200 rounded-full h-4">
-                        <div 
-                          className="bg-blue-600 rounded-full h-4" 
-                          style={{ width: `${Math.round(analysisResult.match_score * 100)}%` }}
-                        ></div>
-                      </div>
-                      <span className="ml-4 text-lg font-medium text-gray-900">
-                        {Math.round(analysisResult.match_score * 100)}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Skills Match */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">Skills Match</h3>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {analysisResult.matching_skills?.map((skill: string, index: number) => (
-                        <span 
-                          key={index}
-                          className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Missing Skills */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900">Missing Skills</h3>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {analysisResult.missing_skills?.map((skill: string, index: number) => (
-                        <span 
-                          key={index}
-                          className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <pre className="bg-gray-50 p-4 rounded-lg overflow-auto max-h-96">
+                    {JSON.stringify(analysisResult, null, 2)}
+                  </pre>
                 </div>
               )}
             </div>

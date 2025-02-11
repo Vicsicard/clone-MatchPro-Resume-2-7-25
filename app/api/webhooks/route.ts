@@ -3,34 +3,51 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error('Missing Stripe environment variables');
-}
+export const runtime = 'edge';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// Initialize Stripe only if environment variables are present
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
-});
+}) : null;
 
-// Assert webhook secret as string since we checked it above
-const webhookSecret: string = process.env.STRIPE_WEBHOOK_SECRET;
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req: Request) {
+  // Return early if Stripe is not configured
+  if (!stripe || !webhookSecret) {
+    console.warn('Stripe is not configured. Skipping webhook processing.');
+    return NextResponse.json(
+      { error: 'Stripe is not configured' },
+      { status: 501 }
+    );
+  }
+
   try {
     const body = await req.text();
     const signature = headers().get('stripe-signature');
 
     if (!signature) {
       return NextResponse.json(
-        { error: 'No signature' },
+        { error: 'No signature found' },
         { status: 400 }
       );
     }
 
-    const event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      webhookSecret
-    );
+    let event: Stripe.Event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        webhookSecret
+      );
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err);
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400 }
+      );
+    }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -66,11 +83,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
+  } catch (err) {
+    console.error('Error processing webhook:', err);
     return NextResponse.json(
       { error: 'Webhook handler failed' },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

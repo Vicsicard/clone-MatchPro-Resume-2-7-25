@@ -1,0 +1,26 @@
+JOHN DOE
+Software Engineer
+
+SUMMARY
+Experienced software engineer with 5+ years of experience in full-stack development, specializing in React, Node.js, and TypeScript.
+
+EXPERIENCE
+Senior Software Engineer | Tech Corp | 2020-Present
+- Led development of microservices architecture using Node.js and Docker
+- Implemented CI/CD pipelines reducing deployment time by 50%
+- Mentored junior developers and conducted code reviews
+
+Software Engineer | StartupCo | 2018-2020
+- Developed React-based frontend applications
+- Implemented RESTful APIs using Express.js
+- Improved application performance by 30%
+
+SKILLS
+- Languages: JavaScript, TypeScript, Python
+- Frontend: React, Vue.js, HTML5, CSS3
+- Backend: Node.js, Express, PostgreSQL
+- Tools: Git, Docker, AWS
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology | 2018

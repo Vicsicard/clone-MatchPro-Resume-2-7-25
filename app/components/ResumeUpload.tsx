@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useDropzone, Accept } from 'react-dropzone'
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
 
 interface ResumeUploadProps {
   onFileSelect: (file: File) => void
-  accept: string
+  accept?: string
   file?: File
+  disabled?: boolean
 }
 
 const acceptedFileTypes: Accept = {
@@ -16,7 +17,7 @@ const acceptedFileTypes: Accept = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
 }
 
-export default function ResumeUpload({ onFileSelect, accept, file: existingFile }: ResumeUploadProps) {
+export default function ResumeUpload({ onFileSelect, accept = '.pdf,.doc,.docx', file: existingFile, disabled = false }: ResumeUploadProps) {
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(existingFile || null)
 
@@ -24,19 +25,30 @@ export default function ResumeUpload({ onFileSelect, accept, file: existingFile 
     setFile(existingFile || null)
   }, [existingFile])
 
-  const onDrop = async (acceptedFiles: File[]) => {
+  const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const uploadedFile = acceptedFiles[0]
+      
+      // Check file size (5MB limit)
+      if (uploadedFile.size > 5 * 1024 * 1024) {
+        setError('File size must be less than 5MB')
+        return
+      }
+
+      setError(null)
       setFile(uploadedFile)
       onFileSelect(uploadedFile)
-      setError(null)
     }
-  }
+  }, [onFileSelect])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: acceptedFileTypes,
-    multiple: false
+    accept: accept.split(',').reduce((acc: Record<string, string[]>, curr) => {
+      acc[curr] = [];
+      return acc;
+    }, {}),
+    maxFiles: 1,
+    disabled,
   })
 
   const removeFile = () => {
@@ -50,9 +62,9 @@ export default function ResumeUpload({ onFileSelect, accept, file: existingFile 
       {!file && (
         <div
           {...getRootProps()}
-          className={`
-            border-2 border-dashed border-gray-300 rounded-lg p-6 transition-colors text-center cursor-pointer
+          className={`border-2 border-dashed border-gray-300 rounded-lg p-6 transition-colors text-center cursor-pointer
             ${isDragActive ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'}
+            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
           <input {...getInputProps()} />
@@ -62,7 +74,7 @@ export default function ResumeUpload({ onFileSelect, accept, file: existingFile 
               <span className="font-medium">Click to upload</span> or drag and drop
             </div>
             <p className="text-xs text-gray-500">
-              PDF, DOC, or DOCX (max 10MB)
+              PDF, DOC, or DOCX (max 5MB)
             </p>
           </div>
         </div>
