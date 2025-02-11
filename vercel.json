@@ -1,12 +1,6 @@
 {
-  "version": 2,
-  "buildCommand": "bash scripts/build.sh && npm run build",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "functions": {
-    "app/api/process-analysis/route.ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  "framework": "nextjs"
 }
