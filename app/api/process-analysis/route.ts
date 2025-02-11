@@ -140,16 +140,18 @@ export async function POST(request: Request) {
         if (output.includes('Processing') || output.includes('Step')) {
           supabase
             .from('analyses')
+            .eq('id', analysisId)
             .update({ 
               results: { progress: output.trim() }
             })
-            .eq('id', analysisId)
-            .then(() => {
-              console.log('Updated progress:', output.trim())
-            })
-            .catch(err => {
-              console.error('Failed to update progress:', err)
-            })
+            .then(
+              () => {
+                console.log('Updated progress:', output.trim())
+              },
+              (err) => {
+                console.error('Failed to update progress:', err)
+              }
+            )
         }
       } catch (e) {
         console.error('Error updating progress:', e)
@@ -165,19 +167,21 @@ export async function POST(request: Request) {
       try {
         supabase
           .from('analyses')
+          .eq('id', analysisId)
           .update({ 
             results: { 
               error: error.trim(),
               lastOutput: output.trim()
             }
           })
-          .eq('id', analysisId)
-          .then(() => {
-            console.log('Updated error log')
-          })
-          .catch(err => {
-            console.error('Failed to update error log:', err)
-          })
+          .then(
+            () => {
+              console.log('Updated error log')
+            },
+            (err) => {
+              console.error('Failed to update error log:', err)
+            }
+          )
       } catch (e) {
         console.error('Error updating error log:', e)
       }
