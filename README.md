@@ -347,3 +347,165 @@ Take the leap, contribute, and let's grow together! 🚀
 <a href="https://github.com/srbhr/Resume-Matcher/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=srbhr/Resume-Matcher" />
 </a>
+
+# MatchPro Resume
+
+A powerful resume analysis tool that helps match resumes with job descriptions using advanced AI techniques. Originally built in Python, now completely rewritten in Next.js for better performance, scalability, and user experience.
+
+## Features
+
+- 📄 Resume and job description analysis
+- 🤖 AI-powered matching
+- 📊 Detailed match scoring
+- 🔒 Secure data handling
+- ✅ Comprehensive testing
+- ⚡ Modern Next.js architecture
+- 🎯 TypeScript for better reliability
+- 🔄 Real-time updates with Supabase
+
+## Technology Stack
+
+- **Frontend**: Next.js, React, TypeScript
+- **Backend**: Next.js API routes
+- **Database**: Supabase (PostgreSQL)
+- **AI/ML**: Cohere API
+- **Testing**: Playwright
+- **Authentication**: Supabase Auth
+- **File Storage**: Supabase Storage
+
+## Migration from Python
+
+This project was originally built using Python (Flask) and SQLite. We've completely migrated to a modern stack:
+
+- Replaced Flask with Next.js for better performance and developer experience
+- Migrated from SQLite to Supabase (PostgreSQL) for better scalability
+- Implemented real-time features using Supabase subscriptions
+- Added TypeScript for improved type safety and developer experience
+- Enhanced UI with modern React components
+- Improved testing with Playwright end-to-end tests
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Supabase account
+- Cohere API key
+
+### Environment Setup
+
+Create a `.env.local` file with the following variables:
+
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# API Keys
+COHERE_API_KEY=your_cohere_api_key
+```
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/MatchPro-Resume.git
+cd MatchPro-Resume
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Run database migrations:
+```bash
+npx supabase migration up
+```
+
+4. Start the development server:
+```bash
+npm run dev
+```
+
+## Testing
+
+We use Playwright for end-to-end testing. To run the tests:
+
+```bash
+# Install Playwright browsers
+npx playwright install
+
+# Run tests
+npm test
+
+# Run tests with debug mode
+npx playwright test --debug
+```
+
+### Test Files
+- `tests/process-analysis.spec.ts`: Tests the analysis workflow
+- `tests/setup.ts`: Test environment setup
+
+## Database Schema
+
+### Tables
+
+1. `analyses`
+   - Stores analysis records
+   - Protected by Row Level Security (RLS)
+   - Fields: id, user_id, status, results, etc.
+
+2. `document_embeddings`
+   - Stores document content and embeddings
+   - Protected by RLS
+   - Fields: id, content, metadata, embedding
+
+## API Endpoints
+
+### POST /api/analyze
+Analyzes a resume against a job description.
+
+**Request:**
+```http
+POST /api/analyze
+Content-Type: multipart/form-data
+
+- resume: File
+- jobDescription: File
+- userId: string
+```
+
+**Response:**
+```json
+{
+  "message": "Analysis completed successfully",
+  "analysisId": "uuid"
+}
+```
+
+## Security
+
+- Row Level Security (RLS) policies protect all database tables
+- Service role access for testing and administrative functions
+- Secure file handling and storage
+- Environment variable validation
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Thanks to Supabase for the amazing database platform
+- Thanks to Cohere for the powerful AI capabilities
+- Thanks to Playwright for the excellent testing framework
