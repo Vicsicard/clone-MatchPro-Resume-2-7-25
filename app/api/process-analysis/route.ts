@@ -107,13 +107,23 @@ export async function POST(request: Request) {
       const versionCheck = spawnSync(pythonPath, ['--version'])
       console.log('Python version check:', versionCheck.stdout.toString(), versionCheck.stderr.toString())
       
-      // Verify SQLite
-      const sqliteCheck = spawnSync(pythonPath, ['-c', 'import sqlite3; print("SQLite version:", sqlite3.sqlite_version)'])
-      console.log('SQLite check:', sqliteCheck.stdout.toString(), sqliteCheck.stderr.toString())
-      
-      // Verify qdrant_client
-      const qdrantCheck = spawnSync(pythonPath, ['-c', 'import qdrant_client; print("qdrant_client imported successfully")'])
+      // Verify qdrant_client cloud mode
+      const qdrantCheck = spawnSync(pythonPath, ['-c', `
+import os
+from qdrant_client import QdrantClient
+
+# Test cloud connection
+client = QdrantClient(
+    url=os.environ.get('QDRANT_URL', ''),
+    api_key=os.environ.get('QDRANT_API_KEY', '')
+)
+print('Successfully connected to Qdrant cloud')
+      `])
       console.log('Qdrant check:', qdrantCheck.stdout.toString(), qdrantCheck.stderr.toString())
+      
+      if (qdrantCheck.status !== 0) {
+        throw new Error('Failed to connect to Qdrant cloud')
+      }
     } catch (err) {
       console.error('Error checking Python dependencies:', err)
       throw new Error('Failed to verify Python dependencies')

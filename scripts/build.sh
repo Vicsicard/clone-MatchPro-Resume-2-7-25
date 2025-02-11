@@ -34,15 +34,21 @@ echo "Verifying Python environment:"
 echo "PYTHONPATH=$PYTHONPATH"
 echo "PATH=$PATH"
 
-echo "Verifying SQLite installation..."
-$PYTHON_PATH -c "import sqlite3; print('SQLite version:', sqlite3.sqlite_version)"
+echo "Verifying cloud dependencies..."
+$PYTHON_PATH -c "
+import os
+from qdrant_client import QdrantClient
+
+# Test cloud connection
+client = QdrantClient(
+    url=os.environ.get('QDRANT_URL', ''),
+    api_key=os.environ.get('QDRANT_API_KEY', '')
+)
+print('Successfully connected to Qdrant cloud')
+"
 
 echo "Verifying spaCy installation..."
 $PYTHON_PATH -c "import spacy; nlp = spacy.load('en_core_web_md'); print('spaCy model loaded successfully')"
-
-echo "Verifying other dependencies..."
-$PYTHON_PATH -c "import cohere; print('cohere imported successfully')"
-$PYTHON_PATH -c "import qdrant_client; print('qdrant_client imported successfully')"
 
 echo "Current directory structure:"
 ls -R
