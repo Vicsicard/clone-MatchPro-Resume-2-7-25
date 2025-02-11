@@ -47,11 +47,12 @@ async function processDocument(file: File) {
         inputType: 'search_document',
     });
 
-    if (!documentEmbeddingResponse.embeddings?.[0]) {
+    const embeddings = documentEmbeddingResponse.embeddings as number[][];
+    if (!embeddings?.[0]) {
         throw new Error('Failed to generate document embedding');
     }
 
-    const documentEmbedding = documentEmbeddingResponse.embeddings[0];
+    const documentEmbedding = embeddings[0];
 
     console.log('Generated embedding');
 
@@ -87,11 +88,12 @@ async function findMatches(text: string) {
         inputType: 'search_query',
     });
 
-    if (!jobEmbeddingResponse.embeddings?.[0]) {
+    const jobEmbeddings = jobEmbeddingResponse.embeddings as number[][];
+    if (!jobEmbeddings?.[0]) {
         throw new Error('Failed to generate job description embedding');
     }
 
-    const jobEmbedding = jobEmbeddingResponse.embeddings[0];
+    const jobEmbedding = jobEmbeddings[0];
 
     // Find matches
     const { data, error } = await supabase
