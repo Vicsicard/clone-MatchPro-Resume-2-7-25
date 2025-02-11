@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument } from 'pdf-lib';
+import pdfParse from 'pdf-parse';
 import { CohereClient } from 'cohere-ai';
 
 export const runtime = 'edge';
@@ -18,13 +18,13 @@ const cohere = new CohereClient({
 async function processDocument(file: File) {
     console.log('Processing document:', file.name);
 
-    // 1. Get PDF text
-    const buffer = await file.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(buffer);
-    const text = pdfDoc.getPages()
-        .map(page => page.getText())
-        .join(' ');
+    // Convert File to Buffer for pdf-parse
+    const buffer = Buffer.from(await file.arrayBuffer());
     
+    // Extract text from PDF
+    const pdfData = await pdfParse(buffer);
+    const text = pdfData.text;
+
     console.log('Extracted text length:', text.length);
 
     // 2. Get embedding
