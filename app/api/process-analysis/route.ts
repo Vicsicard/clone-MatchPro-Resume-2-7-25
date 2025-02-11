@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     console.log('Updated status to processing')
 
     // Get Python path
-    const pythonPath = '/python312/bin/python3'
+    const pythonPath = 'python3'
     console.log('Using Python path:', pythonPath)
 
     // Get project root and verify paths
@@ -136,8 +136,7 @@ export async function POST(request: Request) {
     ], {
       env: {
         ...process.env,
-        PATH: `/python312/bin:${process.env.PATH}`,
-        PYTHONPATH: `${projectRoot}:/python312/lib/python3.12/site-packages`,
+        PYTHONPATH: projectRoot,
         COHERE_API_KEY: process.env.COHERE_API_KEY || '',
         QDRANT_API_KEY: process.env.QDRANT_API_KEY || '',
         QDRANT_URL: process.env.QDRANT_URL || ''

@@ -11,25 +11,10 @@ uname -a
 pwd
 ls -la
 
-# Install system dependencies
-echo "Installing system dependencies..."
-apt-get update
-apt-get install -y python3-dev libsqlite3-dev
-
-PYTHON_PATH="/python312/bin/python3"
-PYTHON_SITE_PACKAGES="/python312/lib/python3.12/site-packages"
-
-echo "Adding Python bin to PATH"
-export PATH="/python312/bin:$PATH"
-
-echo "Checking Python installation..."
-if [ -f "$PYTHON_PATH" ]; then
-    echo "Python3 found at: $PYTHON_PATH"
-    $PYTHON_PATH --version
-else
-    echo "Error: Python not found at $PYTHON_PATH"
-    exit 1
-fi
+# Use python3 from PATH
+PYTHON_PATH=$(which python3)
+echo "Using Python at: $PYTHON_PATH"
+$PYTHON_PATH --version
 
 echo "Python pip version:"
 $PYTHON_PATH -m pip --version
@@ -48,8 +33,6 @@ $PYTHON_PATH -m spacy download en_core_web_md
 echo "Verifying Python environment:"
 echo "PYTHONPATH=$PYTHONPATH"
 echo "PATH=$PATH"
-echo "Python site-packages:"
-ls -la $PYTHON_SITE_PACKAGES
 
 echo "Verifying SQLite installation..."
 $PYTHON_PATH -c "import sqlite3; print('SQLite version:', sqlite3.sqlite_version)"
