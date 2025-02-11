@@ -11,6 +11,11 @@ uname -a
 pwd
 ls -la
 
+# Install system dependencies
+echo "Installing system dependencies..."
+apt-get update
+apt-get install -y python3-dev libsqlite3-dev
+
 PYTHON_PATH="/python312/bin/python3"
 PYTHON_SITE_PACKAGES="/python312/lib/python3.12/site-packages"
 
@@ -37,6 +42,7 @@ echo "Installed Python packages:"
 $PYTHON_PATH -m pip list
 
 echo "Installing spaCy model..."
+$PYTHON_PATH -m pip install spacy
 $PYTHON_PATH -m spacy download en_core_web_md
 
 echo "Verifying Python environment:"
@@ -44,6 +50,9 @@ echo "PYTHONPATH=$PYTHONPATH"
 echo "PATH=$PATH"
 echo "Python site-packages:"
 ls -la $PYTHON_SITE_PACKAGES
+
+echo "Verifying SQLite installation..."
+$PYTHON_PATH -c "import sqlite3; print('SQLite version:', sqlite3.sqlite_version)"
 
 echo "Verifying spaCy installation..."
 $PYTHON_PATH -c "import spacy; nlp = spacy.load('en_core_web_md'); print('spaCy model loaded successfully')"

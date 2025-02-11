@@ -102,12 +102,21 @@ export async function POST(request: Request) {
     console.log('Project root:', projectRoot)
     console.log('Current directory contents:', fs.readdirSync(projectRoot))
     
-    // Verify Python installation
+    // Verify Python installation and dependencies
     try {
       const versionCheck = spawnSync(pythonPath, ['--version'])
       console.log('Python version check:', versionCheck.stdout.toString(), versionCheck.stderr.toString())
+      
+      // Verify SQLite
+      const sqliteCheck = spawnSync(pythonPath, ['-c', 'import sqlite3; print("SQLite version:", sqlite3.sqlite_version)'])
+      console.log('SQLite check:', sqliteCheck.stdout.toString(), sqliteCheck.stderr.toString())
+      
+      // Verify qdrant_client
+      const qdrantCheck = spawnSync(pythonPath, ['-c', 'import qdrant_client; print("qdrant_client imported successfully")'])
+      console.log('Qdrant check:', qdrantCheck.stdout.toString(), qdrantCheck.stderr.toString())
     } catch (err) {
-      console.error('Error checking Python version:', err)
+      console.error('Error checking Python dependencies:', err)
+      throw new Error('Failed to verify Python dependencies')
     }
 
     // Verify files exist
