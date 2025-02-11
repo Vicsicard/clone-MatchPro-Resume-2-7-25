@@ -122,18 +122,17 @@ print('Python version:', sys.version)
 print('PATH:', os.environ.get('PATH', ''))
 
 from qdrant_client import QdrantClient
-from qdrant_client.http import models
 
 # Test cloud connection
 client = QdrantClient(
-    url=os.environ.get('QDRANT_URL', ''),
+    location=os.environ.get('QDRANT_URL', ''),
     api_key=os.environ.get('QDRANT_API_KEY', ''),
-    prefer_grpc=False  # Force HTTP mode
+    grpc_port=None  # Force HTTP mode
 )
 
 # Test the connection with a simple operation
-health = client.http.health()
-print('Qdrant health check:', health)
+collections = client.get_collections()
+print('Qdrant collections:', collections)
 print('Successfully connected to Qdrant cloud')
       `])
       console.log('Qdrant check:', qdrantCheck.stdout.toString(), qdrantCheck.stderr.toString())
