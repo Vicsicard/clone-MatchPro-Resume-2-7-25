@@ -140,10 +140,10 @@ export async function POST(request: Request) {
         if (output.includes('Processing') || output.includes('Step')) {
           supabase
             .from('analyses')
-            .eq('id', analysisId)
             .update({ 
               results: { progress: output.trim() }
             })
+            .match({ id: analysisId })
             .then(
               () => {
                 console.log('Updated progress:', output.trim())
@@ -167,13 +167,13 @@ export async function POST(request: Request) {
       try {
         supabase
           .from('analyses')
-          .eq('id', analysisId)
           .update({ 
             results: { 
               error: error.trim(),
               lastOutput: output.trim()
             }
           })
+          .match({ id: analysisId })
           .then(
             () => {
               console.log('Updated error log')
@@ -213,11 +213,11 @@ export async function POST(request: Request) {
       
       await supabase
         .from('analyses')
-        .eq('id', analysisId)
         .update({
           status: 'completed',
           results: analysisResult
         })
+        .match({ id: analysisId })
       console.log('Updated analysis with results')
 
       return NextResponse.json({
@@ -240,11 +240,11 @@ export async function POST(request: Request) {
       try {
         await supabase
           .from('analyses')
-          .eq('id', analysisId)
           .update({
             status: 'failed',
             results: { error: error.message || 'Unknown error occurred' }
           })
+          .match({ id: analysisId })
         console.log('Updated analysis status to failed')
       } catch (e) {
         console.error('Failed to update analysis status:', e)
