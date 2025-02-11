@@ -1,331 +1,108 @@
-import { createServerSupabaseClient } from '../../supabase/server'
-import { NextResponse } from 'next/server'
-import { spawn, spawnSync } from 'child_process'
-import path from 'path'
-import fs from 'fs'
-import os from 'os'
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { PDFDocument } from 'pdf-lib';
+import { CohereClient } from 'cohere-ai';
 
-export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient()
-  let tempDir: string | null = null;
-  let analysisId: string | null = null;
-  
-  try {
-    console.log('Starting analysis process...')
+export const runtime = 'edge';
+
+// Initialize clients
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+);
+
+const cohere = new CohereClient({ 
+    token: process.env.COHERE_API_KEY! 
+});
+
+async function processDocument(file: File) {
+    console.log('Processing document:', file.name);
+
+    // 1. Get PDF text
+    const buffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(buffer);
+    const text = pdfDoc.getPages()
+        .map(page => page.getText())
+        .join(' ');
     
-    // Check authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
-      console.error('Authentication error:', authError)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    console.log('Authentication successful')
+    console.log('Extracted text length:', text.length);
 
-    // Get analysis ID from request
-    const requestData = await request.json()
-    analysisId = requestData.analysisId
-    if (!analysisId) {
-      console.error('No analysis ID provided')
-      return NextResponse.json({ error: 'Analysis ID is required' }, { status: 400 })
-    }
-    console.log('Analysis ID:', analysisId)
-
-    // Get analysis record
-    const { data: analysis, error: fetchError } = await supabase
-      .from('analyses')
-      .select('*')
-      .eq('id', analysisId)
-      .single()
-
-    if (fetchError || !analysis) {
-      console.error('Error fetching analysis:', fetchError)
-      return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
-    }
-    console.log('Found analysis record:', analysis.id)
-
-    // Download files
-    console.log('Downloading resume file:', analysis.resume_url)
-    const { data: resumeFile, error: resumeError } = await supabase.storage
-      .from('resumes')
-      .download(analysis.resume_url.replace('resumes/', ''))
-
-    if (resumeError) {
-      console.error('Error downloading resume:', resumeError)
-      throw new Error('Failed to download resume')
-    }
-
-    console.log('Downloading job description file:', analysis.job_description_url)
-    const { data: jobFile, error: jobError } = await supabase.storage
-      .from('jobs')
-      .download(analysis.job_description_url.replace('jobs/', ''))
-
-    if (jobError) {
-      console.error('Error downloading job description:', jobError)
-      throw new Error('Failed to download job description')
-    }
-
-    if (!resumeFile || !jobFile) {
-      console.error('Files not found:', { resume: !resumeFile, job: !jobFile })
-      throw new Error('Failed to download files')
-    }
-    console.log('Files downloaded successfully')
-
-    // Create temp directory
-    tempDir = path.join(os.tmpdir(), 'resume-analysis-' + Date.now())
-    await fs.promises.mkdir(tempDir, { recursive: true })
-    console.log('Created temp directory:', tempDir)
+    // 2. Get embedding
+    const embedding = await cohere.embed({
+        texts: [text],
+        model: 'embed-english-v3.0'
+    });
     
-    const resumePath = path.join(tempDir, 'resume.pdf')
-    const jobPath = path.join(tempDir, 'job.pdf')
-    
-    // Save files
-    await fs.promises.writeFile(resumePath, Buffer.from(await resumeFile.arrayBuffer()))
-    await fs.promises.writeFile(jobPath, Buffer.from(await jobFile.arrayBuffer()))
-    console.log('Files saved to temp directory')
+    console.log('Generated embedding');
 
-    // Update status to processing
-    await supabase
-      .from('analyses')
-      .update({ 
-        status: 'processing',
-        results: { progress: 'Processing documents...' }
-      })
-      .eq('id', analysisId)
-    console.log('Updated status to processing')
-
-    // Get Python path and set up environment
-    const pythonPath = 'python3'
-    const pythonBinDir = '/python312/bin'
-    process.env.PATH = `${pythonBinDir}:${process.env.PATH}`
-    
-    console.log('Using Python path:', pythonPath)
-    console.log('Python bin directory:', pythonBinDir)
-    console.log('PATH:', process.env.PATH)
-
-    // Get project root and verify paths
-    const projectRoot = process.cwd()
-    console.log('Project root:', projectRoot)
-    console.log('Current directory contents:', fs.readdirSync(projectRoot))
-    console.log('Python bin contents:', fs.readdirSync(pythonBinDir))
-    
-    // Verify Python installation and dependencies
-    try {
-      const versionCheck = spawnSync(pythonPath, ['--version'])
-      console.log('Python version check:', versionCheck.stdout.toString(), versionCheck.stderr.toString())
-      
-      // Verify qdrant_client cloud mode
-      const qdrantCheck = spawnSync(pythonPath, ['-c', `
-import os
-import sys
-print('Python path:', sys.executable)
-print('Python version:', sys.version)
-print('PATH:', os.environ.get('PATH', ''))
-
-from qdrant_client import QdrantClient
-
-# Test cloud connection
-client = QdrantClient(
-    location=os.environ.get('QDRANT_URL', ''),
-    api_key=os.environ.get('QDRANT_API_KEY', ''),
-    grpc_port=None  # Force HTTP mode
-)
-
-# Test the connection with a simple operation
-collections = client.get_collections()
-print('Qdrant collections:', collections)
-print('Successfully connected to Qdrant cloud')
-      `])
-      console.log('Qdrant check:', qdrantCheck.stdout.toString(), qdrantCheck.stderr.toString())
-      
-      if (qdrantCheck.status !== 0) {
-        throw new Error('Failed to connect to Qdrant cloud')
-      }
-    } catch (err) {
-      console.error('Error checking Python dependencies:', err)
-      throw new Error('Failed to verify Python dependencies')
-    }
-
-    // Verify files exist
-    console.log('Verifying files exist:')
-    console.log('Resume file exists:', fs.existsSync(resumePath))
-    console.log('Job file exists:', fs.existsSync(jobPath))
-    console.log('Resume file size:', fs.statSync(resumePath).size)
-    console.log('Job file size:', fs.statSync(jobPath).size)
-    
-    const pythonProcess = spawn(pythonPath, [
-      '-m',
-      'resume_matcher.scripts',
-      resumePath,
-      jobPath,
-      '--mode', 'full',
-      '--output', 'json'
-    ], {
-      env: {
-        ...process.env,
-        PATH: `${pythonBinDir}:${process.env.PATH}`,
-        PYTHONPATH: projectRoot,
-        COHERE_API_KEY: process.env.COHERE_API_KEY || '',
-        QDRANT_API_KEY: process.env.QDRANT_API_KEY || '',
-        QDRANT_URL: process.env.QDRANT_URL || ''
-      },
-      cwd: projectRoot
-    })
-
-    console.log('Python process spawned')
-
-    let result = ''
-    let error = ''
-
-    pythonProcess.stdout.on('data', (data) => {
-      const output = data.toString()
-      console.log('Python stdout:', output)
-      result += output
-      
-      // Update progress in database
-      try {
-        if (output.includes('Processing') || output.includes('Step')) {
-          supabase
-            .from('analyses')
-            .update({ 
-              results: { progress: output.trim() }
-            })
-            .match({ id: analysisId })
-            .then(
-              () => {
-                console.log('Updated progress:', output.trim())
-              },
-              (err) => {
-                console.error('Failed to update progress:', err)
-              }
-            )
-        }
-      } catch (e) {
-        console.error('Error updating progress:', e)
-      }
-    })
-
-    pythonProcess.stderr.on('data', (data) => {
-      const output = data.toString()
-      console.error('Python stderr:', output)
-      error += output
-      
-      // Log error to database
-      try {
-        supabase
-          .from('analyses')
-          .update({ 
-            results: { 
-              error: error.trim(),
-              lastOutput: output.trim()
+    // 3. Store in Supabase
+    const { data, error } = await supabase
+        .from('document_embeddings')
+        .insert({
+            content_type: 'resume',
+            content: text,
+            embedding: embedding.embeddings[0],
+            metadata: {
+                filename: file.name,
+                processed_at: new Date().toISOString()
             }
-          })
-          .match({ id: analysisId })
-          .then(
-            () => {
-              console.log('Updated error log')
-            },
-            (err) => {
-              console.error('Failed to update error log:', err)
-            }
-          )
-      } catch (e) {
-        console.error('Error updating error log:', e)
-      }
-    })
-
-    pythonProcess.on('error', (err) => {
-      console.error('Failed to start Python process:', err)
-      error += err.message
-    })
-
-    pythonProcess.on('close', (code) => {
-      console.log('Python process exited with code:', code)
-      if (code !== 0) {
-        console.error('Python process failed with code:', code)
-        console.error('Error output:', error)
-      }
-    })
-
-    // Wait for completion
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        pythonProcess.kill()
-        reject(new Error('Analysis timed out after 5 minutes'))
-      }, 5 * 60 * 1000)
-
-      pythonProcess.on('close', (code) => {
-        clearTimeout(timeout)
-        console.log('Python process closed with code:', code)
-        if (code === 0) {
-          resolve(null)
-        } else {
-          reject(new Error(`Analysis failed with code ${code}: ${error}`))
-        }
-      })
-    })
-
-    // Parse and save results
-    try {
-      console.log('Raw result:', result)
-      const analysisResult = JSON.parse(result.trim())
-      console.log('Parsed result:', analysisResult)
-      
-      await supabase
-        .from('analyses')
-        .update({
-          status: 'completed',
-          results: analysisResult
         })
-        .match({ id: analysisId })
-      console.log('Updated analysis with results')
+        .select()
+        .single();
 
-      return NextResponse.json({
-        success: true,
-        message: 'Analysis completed successfully',
-        results: analysisResult
-      })
-
-    } catch (e: Error | unknown) {
-      const errorMessage = e instanceof Error ? e.message : 'Failed to parse analysis results'
-      console.error('Error parsing results:', errorMessage)
-      throw new Error(`Failed to parse analysis results: ${errorMessage}`)
+    if (error) {
+        console.error('Supabase error:', error);
+        throw error;
     }
-
-  } catch (error: any) {
-    console.error('Analysis error:', error)
     
-    // Update analysis status to failed
-    if (analysisId) {
-      try {
-        await supabase
-          .from('analyses')
-          .update({
-            status: 'failed',
-            results: { error: error.message || 'Unknown error occurred' }
-          })
-          .match({ id: analysisId })
-        console.log('Updated analysis status to failed')
-      } catch (e) {
-        console.error('Failed to update analysis status:', e)
-      }
-    }
+    console.log('Stored document with ID:', data.id);
+    return data;
+}
 
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'An error occurred during analysis'
-    }, {
-      status: 500
-    })
+async function findMatches(text: string) {
+    // 1. Get query embedding
+    const embedding = await cohere.embed({
+        texts: [text],
+        model: 'embed-english-v3.0'
+    });
 
-  } finally {
-    // Cleanup temp directory
-    if (tempDir) {
-      try {
-        await fs.promises.rm(tempDir, { recursive: true })
-        console.log('Cleaned up temp directory')
-      } catch (e) {
-        console.error('Failed to cleanup temp directory:', e)
-      }
+    // 2. Find matches
+    const { data, error } = await supabase
+        .rpc('match_documents', {
+            query_embedding: embedding.embeddings[0]
+        });
+
+    if (error) throw error;
+    return data;
+}
+
+export async function POST(req: Request) {
+    try {
+        const formData = await req.formData();
+        const file = formData.get('file') as File;
+        const jobDescription = formData.get('jobDescription') as string;
+
+        // Process the uploaded resume
+        const resumeResult = await processDocument(file);
+
+        // If job description is provided, find matches
+        let matches = null;
+        if (jobDescription) {
+            matches = await findMatches(jobDescription);
+        }
+        
+        return NextResponse.json({ 
+            success: true, 
+            data: {
+                resume: resumeResult,
+                matches: matches
+            }
+        });
+    } catch (error) {
+        console.error('Processing failed:', error);
+        return NextResponse.json(
+            { error: 'Processing failed', details: error instanceof Error ? error.message : 'Unknown error' },
+            { status: 500 }
+        );
     }
-  }
 }
