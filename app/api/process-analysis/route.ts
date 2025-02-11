@@ -8,7 +8,7 @@ export const runtime = 'edge';
 // Initialize clients
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
+    process.env.SUPABASE_SERVICE_KEY_SECRET!
 );
 
 const cohere = new CohereClient({ 
