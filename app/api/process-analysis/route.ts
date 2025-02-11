@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '../../supabase/server'
 import { NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
@@ -94,23 +94,28 @@ export async function POST(request: Request) {
     console.log('Updated status to processing')
 
     // Get Python path
-    const pythonPath = process.env.PYTHON_PATH || 'python3'
+    const pythonPath = '/python312/bin/python3'
     console.log('Using Python path:', pythonPath)
 
-    // Run Python script
+    // Get project root and verify paths
     const projectRoot = process.cwd()
+    console.log('Project root:', projectRoot)
+    console.log('Current directory contents:', fs.readdirSync(projectRoot))
     
-    console.log('Starting Python process with:', {
-      pythonPath,
-      projectRoot,
-      resumePath,
-      jobPath,
-      env: {
-        COHERE_API_KEY: process.env.COHERE_API_KEY ? 'set' : 'not set',
-        QDRANT_API_KEY: process.env.QDRANT_API_KEY ? 'set' : 'not set',
-        QDRANT_URL: process.env.QDRANT_URL ? 'set' : 'not set'
-      }
-    })
+    // Verify Python installation
+    try {
+      const versionCheck = spawnSync(pythonPath, ['--version'])
+      console.log('Python version check:', versionCheck.stdout.toString(), versionCheck.stderr.toString())
+    } catch (err) {
+      console.error('Error checking Python version:', err)
+    }
+
+    // Verify files exist
+    console.log('Verifying files exist:')
+    console.log('Resume file exists:', fs.existsSync(resumePath))
+    console.log('Job file exists:', fs.existsSync(jobPath))
+    console.log('Resume file size:', fs.statSync(resumePath).size)
+    console.log('Job file size:', fs.statSync(jobPath).size)
     
     const pythonProcess = spawn(pythonPath, [
       '-m',
@@ -122,13 +127,16 @@ export async function POST(request: Request) {
     ], {
       env: {
         ...process.env,
-        PYTHONPATH: projectRoot,
+        PATH: `/python312/bin:${process.env.PATH}`,
+        PYTHONPATH: `${projectRoot}:/python312/lib/python3.12/site-packages`,
         COHERE_API_KEY: process.env.COHERE_API_KEY || '',
         QDRANT_API_KEY: process.env.QDRANT_API_KEY || '',
         QDRANT_URL: process.env.QDRANT_URL || ''
       },
       cwd: projectRoot
     })
+
+    console.log('Python process spawned')
 
     let result = ''
     let error = ''
@@ -187,6 +195,19 @@ export async function POST(request: Request) {
           )
       } catch (e) {
         console.error('Error updating error log:', e)
+      }
+    })
+
+    pythonProcess.on('error', (err) => {
+      console.error('Failed to start Python process:', err)
+      error += err.message
+    })
+
+    pythonProcess.on('close', (code) => {
+      console.log('Python process exited with code:', code)
+      if (code !== 0) {
+        console.error('Python process failed with code:', code)
+        console.error('Error output:', error)
       }
     })
 
