@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as pdfjsLib from 'pdfjs-dist';
-import { CohereClient } from 'cohere-ai';
+import { CohereClient, EmbeddingsResponse } from 'cohere-ai';
 
 export const runtime = 'edge';
 
@@ -41,11 +41,15 @@ async function processDocument(file: File) {
     console.log('Extracted text length:', text.length);
 
     // 2. Get embedding
-    const { embeddings: [embedding] } = await cohere.embed({
+    const documentEmbeddingResponse: EmbeddingsResponse = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
     });
     
+    const documentEmbedding = Array.isArray(documentEmbeddingResponse.embeddings) 
+        ? documentEmbeddingResponse.embeddings[0] 
+        : documentEmbeddingResponse.embeddings;
+
     console.log('Generated embedding');
 
     // 3. Store in Supabase
@@ -54,7 +58,7 @@ async function processDocument(file: File) {
         .insert({
             content_type: 'resume',
             content: text,
-            embedding: embedding,
+            embedding: documentEmbedding,
             metadata: {
                 filename: file.name,
                 processed_at: new Date().toISOString()
@@ -74,15 +78,19 @@ async function processDocument(file: File) {
 
 async function findMatches(text: string) {
     // 1. Get query embedding
-    const { embeddings: [embedding] } = await cohere.embed({
+    const jobEmbeddingResponse: EmbeddingsResponse = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
     });
 
+    const jobEmbedding = Array.isArray(jobEmbeddingResponse.embeddings) 
+        ? jobEmbeddingResponse.embeddings[0] 
+        : jobEmbeddingResponse.embeddings;
+
     // 2. Find matches
     const { data, error } = await supabase
         .rpc('match_documents', {
-            query_embedding: embedding
+            query_embedding: jobEmbedding
         });
 
     if (error) throw error;
