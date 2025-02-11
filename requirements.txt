@@ -19,7 +19,7 @@ tqdm>=4.65.0
 PyYAML>=6.0.1
 
 # Vector similarity and embeddings
-qdrant-client>=1.1.1
+qdrant-client==1.1.7
 cohere>=4.5.1
 
 # Add comment to install spaCy model separately:
