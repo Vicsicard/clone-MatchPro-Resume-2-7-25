@@ -41,7 +41,7 @@ async function processDocument(file: File) {
     console.log('Extracted text length:', text.length);
 
     // 2. Get embedding
-    const embeddingResponse = await cohere.embed({
+    const { embeddings: [embedding] } = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
     });
@@ -54,7 +54,7 @@ async function processDocument(file: File) {
         .insert({
             content_type: 'resume',
             content: text,
-            embedding: embeddingResponse.embeddings[0],
+            embedding: embedding,
             metadata: {
                 filename: file.name,
                 processed_at: new Date().toISOString()
@@ -74,7 +74,7 @@ async function processDocument(file: File) {
 
 async function findMatches(text: string) {
     // 1. Get query embedding
-    const embeddingResponse = await cohere.embed({
+    const { embeddings: [embedding] } = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
     });
@@ -82,7 +82,7 @@ async function findMatches(text: string) {
     // 2. Find matches
     const { data, error } = await supabase
         .rpc('match_documents', {
-            query_embedding: embeddingResponse.embeddings[0]
+            query_embedding: embedding
         });
 
     if (error) throw error;
