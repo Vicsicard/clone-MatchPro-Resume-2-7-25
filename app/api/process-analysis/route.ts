@@ -71,7 +71,16 @@ export async function POST(request: Request) {
 
     // Run Python script
     const pythonPath = process.env.PYTHON_PATH || 'python'
-    const scriptPath = path.join(process.cwd(), 'resume_matcher', 'scripts', '__main__.py')
+    const projectRoot = process.cwd()
+    const scriptPath = path.join(projectRoot, 'resume_matcher', 'scripts', '__main__.py')
+    
+    console.log('Starting Python process:', {
+      pythonPath,
+      scriptPath,
+      projectRoot,
+      resumePath,
+      jobPath
+    })
     
     const pythonProcess = spawn(pythonPath, [
       scriptPath,
@@ -82,20 +91,23 @@ export async function POST(request: Request) {
     ], {
       env: {
         ...process.env,
-        PYTHONPATH: process.cwd(),
-      }
+        PYTHONPATH: projectRoot,
+      },
+      cwd: projectRoot
     })
 
     let result = ''
     let error = ''
 
     pythonProcess.stdout.on('data', (data) => {
-      result += data.toString()
+      const output = data.toString()
+      console.log('Python stdout:', output)
+      result += output
     })
 
     pythonProcess.stderr.on('data', (data) => {
       const output = data.toString()
-      console.log('Python output:', output)
+      console.error('Python stderr:', output)
       error += output
     })
 

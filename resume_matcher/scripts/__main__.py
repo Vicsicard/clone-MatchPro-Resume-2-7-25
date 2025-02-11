@@ -7,55 +7,52 @@ from resume_matcher.scripts.processor import process_files
 
 def main():
     try:
-        print("Starting resume analysis...", file=sys.stderr)
+        print("Starting resume analysis...", file=sys.stderr, flush=True)
         
         parser = argparse.ArgumentParser(description='Process resume and job description files.')
-        parser.add_argument('--input-resume', required=True, help='Path to the resume file')
-        parser.add_argument('--input-job', required=True, help='Path to the job description file')
+        parser.add_argument('resume', help='Path to the resume file')
+        parser.add_argument('job', help='Path to the job description file')
         parser.add_argument('--mode', default='full', choices=['full', 'basic'], help='Analysis mode')
-        parser.add_argument('--format', default='json', choices=['json', 'text'], help='Output format')
+        parser.add_argument('--output', default='json', choices=['json', 'text'], help='Output format')
         
         args = parser.parse_args()
         
         # Log input parameters
-        print(f"Input parameters:", file=sys.stderr)
-        print(f"  Resume: {args.input_resume}", file=sys.stderr)
-        print(f"  Job Description: {args.input_job}", file=sys.stderr)
-        print(f"  Mode: {args.mode}", file=sys.stderr)
-        print(f"  Format: {args.format}", file=sys.stderr)
+        print(f"Input parameters:", file=sys.stderr, flush=True)
+        print(f"  Resume: {args.resume}", file=sys.stderr, flush=True)
+        print(f"  Job Description: {args.job}", file=sys.stderr, flush=True)
+        print(f"  Mode: {args.mode}", file=sys.stderr, flush=True)
+        print(f"  Format: {args.output}", file=sys.stderr, flush=True)
         
         # Verify files exist
-        if not os.path.exists(args.input_resume):
-            raise FileNotFoundError(f"Resume file not found: {args.input_resume}")
-        if not os.path.exists(args.input_job):
-            raise FileNotFoundError(f"Job description file not found: {args.input_job}")
+        if not os.path.exists(args.resume):
+            raise FileNotFoundError(f"Resume file not found: {args.resume}")
+        if not os.path.exists(args.job):
+            raise FileNotFoundError(f"Job description file not found: {args.job}")
             
-        print("Files verified, starting processing...", file=sys.stderr)
+        print("Files verified, starting processing...", file=sys.stderr, flush=True)
         
-        # Process the files and get analysis results
-        result = process_files(
-            resume_path=args.input_resume,
-            job_path=args.input_job,
-            mode=args.mode,
-            output_format=args.format
-        )
-        
-        # Check for errors
-        if 'error' in result:
-            print(f"Error in processing: {result['error']}", file=sys.stderr)
-            print(json.dumps({'error': result['error']}), file=sys.stderr)
-            sys.exit(1)
+        try:
+            # Process the files and get analysis results
+            result = process_files(
+                resume_path=args.resume,
+                job_path=args.job,
+                mode=args.mode,
+                output_format=args.output
+            )
+            print(f"Process files returned: {result}", file=sys.stderr, flush=True)
             
-        print("Processing completed successfully", file=sys.stderr)
-        
-        # Print results as JSON to stdout
-        print(json.dumps(result))
-        sys.exit(0)
+            # Print results to stdout
+            print(json.dumps(result, indent=2))
+            
+        except Exception as e:
+            print(f"Error in process_files: {str(e)}", file=sys.stderr, flush=True)
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr, flush=True)
+            raise
         
     except Exception as e:
-        print(f"Fatal error: {str(e)}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        print(json.dumps({'error': str(e)}), file=sys.stderr)
+        print(f"Error: {str(e)}", file=sys.stderr, flush=True)
+        print(f"Traceback: {traceback.format_exc()}", file=sys.stderr, flush=True)
         sys.exit(1)
 
 if __name__ == '__main__':

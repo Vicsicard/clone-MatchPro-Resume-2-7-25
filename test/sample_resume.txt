@@ -1,0 +1,23 @@
+JOHN DOE
+Software Engineer
+
+EXPERIENCE
+Senior Software Engineer at Tech Corp (2020-Present)
+- Developed and maintained microservices using Node.js and Python
+- Led a team of 5 engineers in building a new cloud-based platform
+- Implemented CI/CD pipelines using Jenkins and Docker
+
+Software Engineer at StartUp Inc (2018-2020)
+- Built RESTful APIs using Django and Flask
+- Optimized database queries resulting in 40% performance improvement
+- Collaborated with cross-functional teams to deliver features
+
+SKILLS
+Programming: Python, JavaScript, Node.js, TypeScript
+Frameworks: React, Django, Flask, Express
+Tools: Git, Docker, Jenkins, AWS
+Databases: PostgreSQL, MongoDB
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology (2014-2018)

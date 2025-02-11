@@ -89,25 +89,32 @@ def read_multiple_pdf(file_path: str) -> list:
 
 def read_single_pdf(file_path: str) -> str:
     """
-    Read a single PDF file and extract the text from each page.
+    Read a single file (PDF or text) and extract the text.
 
     Args:
-        file_path (str): The path of the PDF file.
+        file_path (str): The path of the file.
 
     Returns:
-        list: A list containing the extracted text from each page of the PDF file.
+        str: The extracted text from the file.
     """
-    output = []
     try:
+        # Check if it's a text file
+        if file_path.lower().endswith(('.txt', '.md')):
+            with open(file_path, "r", encoding='utf-8') as f:
+                return f.read()
+        
+        # Handle PDF files
         with open(file_path, "rb") as f:
             pdf_reader = PdfReader(f)
+            output = []
             count = len(pdf_reader.pages)
             for i in range(count):
                 page = pdf_reader.pages[i]
                 output.append(page.extract_text())
+            return " ".join(output)
     except Exception as e:
         print(f"Error reading file '{file_path}': {str(e)}")
-    return str(" ".join(output))
+        return ""
 
 
 def get_pdf_files(file_path: str) -> list:
