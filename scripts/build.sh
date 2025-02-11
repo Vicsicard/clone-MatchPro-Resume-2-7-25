@@ -11,8 +11,12 @@ uname -a
 pwd
 ls -la
 
-# Use python3 from PATH
+# Set up Python paths
 PYTHON_PATH=$(which python3)
+PYTHON_BIN_DIR="/python312/bin"
+echo "Adding Python bin directory to PATH"
+export PATH="$PYTHON_BIN_DIR:$PATH"
+
 echo "Using Python at: $PYTHON_PATH"
 $PYTHON_PATH --version
 
@@ -21,18 +25,20 @@ $PYTHON_PATH -m pip --version
 
 echo "Installing Python dependencies..."
 $PYTHON_PATH -m pip install --upgrade pip
-$PYTHON_PATH -m pip install -r requirements.txt
+$PYTHON_PATH -m pip install --no-warn-script-location -r requirements.txt
 
 echo "Installed Python packages:"
 $PYTHON_PATH -m pip list
 
 echo "Installing spaCy model..."
-$PYTHON_PATH -m pip install spacy
+$PYTHON_PATH -m pip install --no-warn-script-location spacy
 $PYTHON_PATH -m spacy download en_core_web_md
 
 echo "Verifying Python environment:"
 echo "PYTHONPATH=$PYTHONPATH"
 echo "PATH=$PATH"
+echo "Python bin contents:"
+ls -la $PYTHON_BIN_DIR
 
 echo "Verifying cloud dependencies..."
 $PYTHON_PATH -c "

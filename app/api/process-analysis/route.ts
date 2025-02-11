@@ -93,14 +93,20 @@ export async function POST(request: Request) {
       .eq('id', analysisId)
     console.log('Updated status to processing')
 
-    // Get Python path
+    // Get Python path and set up environment
     const pythonPath = 'python3'
+    const pythonBinDir = '/python312/bin'
+    process.env.PATH = `${pythonBinDir}:${process.env.PATH}`
+    
     console.log('Using Python path:', pythonPath)
+    console.log('Python bin directory:', pythonBinDir)
+    console.log('PATH:', process.env.PATH)
 
     // Get project root and verify paths
     const projectRoot = process.cwd()
     console.log('Project root:', projectRoot)
     console.log('Current directory contents:', fs.readdirSync(projectRoot))
+    console.log('Python bin contents:', fs.readdirSync(pythonBinDir))
     
     // Verify Python installation and dependencies
     try {
@@ -110,6 +116,11 @@ export async function POST(request: Request) {
       // Verify qdrant_client cloud mode
       const qdrantCheck = spawnSync(pythonPath, ['-c', `
 import os
+import sys
+print('Python path:', sys.executable)
+print('Python version:', sys.version)
+print('PATH:', os.environ.get('PATH', ''))
+
 from qdrant_client import QdrantClient
 
 # Test cloud connection
@@ -146,6 +157,7 @@ print('Successfully connected to Qdrant cloud')
     ], {
       env: {
         ...process.env,
+        PATH: `${pythonBinDir}:${process.env.PATH}`,
         PYTHONPATH: projectRoot,
         COHERE_API_KEY: process.env.COHERE_API_KEY || '',
         QDRANT_API_KEY: process.env.QDRANT_API_KEY || '',
