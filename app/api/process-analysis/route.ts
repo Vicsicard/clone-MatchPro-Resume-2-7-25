@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import pdfParse from 'pdf-parse';
+import * as pdfjsLib from 'pdfjs-dist';
 import { CohereClient } from 'cohere-ai';
 
 export const runtime = 'edge';
@@ -11,26 +11,39 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY_SECRET!
 );
 
-const cohere = new CohereClient({ 
-    token: process.env.COHERE_API_KEY! 
+const cohere = new CohereClient({
+    token: process.env.COHERE_API_KEY!,
 });
+
+// Set worker source
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 async function processDocument(file: File) {
     console.log('Processing document:', file.name);
 
-    // Convert File to Buffer for pdf-parse
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Convert File to ArrayBuffer
+    const buffer = await file.arrayBuffer();
     
-    // Extract text from PDF
-    const pdfData = await pdfParse(buffer);
-    const text = pdfData.text;
+    // Load PDF document
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = '';
+
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items
+            .map((item: any) => item.str)
+            .join(' ');
+        text += pageText + ' ';
+    }
 
     console.log('Extracted text length:', text.length);
 
     // 2. Get embedding
-    const embedding = await cohere.embed({
+    const embeddingResponse = await cohere.embed({
         texts: [text],
-        model: 'embed-english-v3.0'
+        model: 'embed-english-v3.0',
     });
     
     console.log('Generated embedding');
@@ -41,7 +54,7 @@ async function processDocument(file: File) {
         .insert({
             content_type: 'resume',
             content: text,
-            embedding: embedding.embeddings[0],
+            embedding: embeddingResponse.embeddings[0],
             metadata: {
                 filename: file.name,
                 processed_at: new Date().toISOString()
@@ -61,15 +74,15 @@ async function processDocument(file: File) {
 
 async function findMatches(text: string) {
     // 1. Get query embedding
-    const embedding = await cohere.embed({
+    const embeddingResponse = await cohere.embed({
         texts: [text],
-        model: 'embed-english-v3.0'
+        model: 'embed-english-v3.0',
     });
 
     // 2. Find matches
     const { data, error } = await supabase
         .rpc('match_documents', {
-            query_embedding: embedding.embeddings[0]
+            query_embedding: embeddingResponse.embeddings[0]
         });
 
     if (error) throw error;
