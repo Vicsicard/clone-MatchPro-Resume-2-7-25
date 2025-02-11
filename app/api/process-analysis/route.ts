@@ -93,8 +93,11 @@ export async function POST(request: Request) {
       .eq('id', analysisId)
     console.log('Updated status to processing')
 
+    // Get Python path
+    const pythonPath = process.env.PYTHON_PATH || 'python3'
+    console.log('Using Python path:', pythonPath)
+
     // Run Python script
-    const pythonPath = process.env.PYTHON_PATH || 'python'
     const projectRoot = process.cwd()
     
     console.log('Starting Python process with:', {

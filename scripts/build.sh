@@ -5,6 +5,11 @@ set -e
 
 echo "Starting build process..."
 
+# Check if Python is installed and print its location
+which python3
+python3 --version
+echo "Python location: $(which python3)"
+
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     echo "Installing Python3..."
