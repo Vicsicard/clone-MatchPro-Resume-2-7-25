@@ -55,6 +55,51 @@ The process is as follows:
 
 <div align="center">
 
+## Recent Updates
+
+### 🚀 Latest Features (February 2025)
+
+1. **Enhanced Error Handling**
+   - Improved error handling throughout the application
+   - Better logging for debugging and troubleshooting
+   - Clear error messages for common issues
+
+2. **Improved Text Processing**
+   - Enhanced text cleaning and preprocessing
+   - Better handling of various document formats
+   - Improved keyword extraction accuracy
+
+3. **Testing Infrastructure**
+   - Added comprehensive test suite for all components
+   - Unit tests for text cleaning, parsing, and similarity scoring
+   - Integration tests for the complete analysis pipeline
+
+4. **API Integration**
+   - Seamless integration with Cohere API for text embeddings
+   - Improved vector similarity calculations
+   - Better handling of API responses and errors
+
+### 🛠️ Technical Improvements
+
+1. **Code Organization**
+   - Modular code structure for better maintainability
+   - Clear separation of concerns between components
+   - Improved code documentation and type hints
+
+2. **Performance Optimization**
+   - Efficient text processing pipeline
+   - Optimized memory usage for large documents
+   - Faster similarity calculations
+
+3. **Developer Experience**
+   - Added sample test files for quick testing
+   - Improved debugging capabilities
+   - Better error reporting and logging
+
+</div>
+
+<div align="center">
+
 ## How to install
 
 </div>
@@ -197,6 +242,33 @@ To run the full stack web application (frontend client and backend api servers),
 4. Enter your ngrok token and run the notebook.
 5. Copy the url and open it in your browser.
 6. ![img_2.png](img_2.png)
+
+## How to Use
+
+1. **Basic Usage**
+   ```bash
+   python -m resume_matcher.scripts <resume_file> <job_file> --mode full --output json
+   ```
+
+2. **Testing Components**
+   ```bash
+   # Test text cleaning
+   python test_clean.py
+   
+   # Test Cohere API integration
+   python test_cohere.py
+   
+   # Test complete process
+   python test_process.py
+   ```
+
+3. **Environment Setup**
+   - Create a `.env` file with your API keys:
+     ```
+     COHERE_API_KEY=your_key_here
+     QDRANT_API_KEY=your_key_here
+     QDRANT_URL=your_url_here
+     ```
 
 ## Code Formatting
 
