@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { CohereClient } from 'cohere-ai';
+import { NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist';
-import { CohereClient, EmbeddingsResponse } from 'cohere-ai';
 
 export const runtime = 'edge';
 
@@ -40,19 +40,22 @@ async function processDocument(file: File) {
 
     console.log('Extracted text length:', text.length);
 
-    // 2. Get embedding
-    const documentEmbeddingResponse: EmbeddingsResponse = await cohere.embed({
+    // Generate embeddings using Cohere
+    const documentEmbeddingResponse = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
+        inputType: 'search_document',
     });
-    
-    const documentEmbedding = Array.isArray(documentEmbeddingResponse.embeddings) 
-        ? documentEmbeddingResponse.embeddings[0] 
-        : documentEmbeddingResponse.embeddings;
+
+    if (!documentEmbeddingResponse.embeddings?.[0]) {
+        throw new Error('Failed to generate document embedding');
+    }
+
+    const documentEmbedding = documentEmbeddingResponse.embeddings[0];
 
     console.log('Generated embedding');
 
-    // 3. Store in Supabase
+    // Store in Supabase
     const { data, error } = await supabase
         .from('document_embeddings')
         .insert({
@@ -77,17 +80,20 @@ async function processDocument(file: File) {
 }
 
 async function findMatches(text: string) {
-    // 1. Get query embedding
-    const jobEmbeddingResponse: EmbeddingsResponse = await cohere.embed({
+    // Generate embeddings using Cohere
+    const jobEmbeddingResponse = await cohere.embed({
         texts: [text],
         model: 'embed-english-v3.0',
+        inputType: 'search_query',
     });
 
-    const jobEmbedding = Array.isArray(jobEmbeddingResponse.embeddings) 
-        ? jobEmbeddingResponse.embeddings[0] 
-        : jobEmbeddingResponse.embeddings;
+    if (!jobEmbeddingResponse.embeddings?.[0]) {
+        throw new Error('Failed to generate job description embedding');
+    }
 
-    // 2. Find matches
+    const jobEmbedding = jobEmbeddingResponse.embeddings[0];
+
+    // Find matches
     const { data, error } = await supabase
         .rpc('match_documents', {
             query_embedding: jobEmbedding
@@ -102,6 +108,10 @@ export async function POST(req: Request) {
         const formData = await req.formData();
         const file = formData.get('file') as File;
         const jobDescription = formData.get('jobDescription') as string;
+
+        if (!file) {
+            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        }
 
         // Process the uploaded resume
         const resumeResult = await processDocument(file);
