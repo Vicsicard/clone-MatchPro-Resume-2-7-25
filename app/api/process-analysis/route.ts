@@ -213,11 +213,11 @@ export async function POST(request: Request) {
       
       await supabase
         .from('analyses')
+        .eq('id', analysisId)
         .update({
           status: 'completed',
           results: analysisResult
         })
-        .eq('id', analysisId)
       console.log('Updated analysis with results')
 
       return NextResponse.json({
@@ -240,11 +240,11 @@ export async function POST(request: Request) {
       try {
         await supabase
           .from('analyses')
+          .eq('id', analysisId)
           .update({
             status: 'failed',
             results: { error: error.message || 'Unknown error occurred' }
           })
-          .eq('id', analysisId)
         console.log('Updated analysis status to failed')
       } catch (e) {
         console.error('Failed to update analysis status:', e)
