@@ -20,7 +20,7 @@ const getStripeAndMode = () => {
   console.log('Stripe mode:', isTestMode ? 'test' : 'live');
   
   return {
-    stripe: new Stripe(secretKey, { apiVersion: '2025-01-27.acacia' }),
+    stripe: new Stripe(secretKey, { apiVersion: '2023-10-16' }),
     isTestMode
   };
 };
