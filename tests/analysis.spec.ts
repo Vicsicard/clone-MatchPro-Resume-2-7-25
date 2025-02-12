@@ -7,10 +7,10 @@ let supabase;
 test.describe('Resume Analysis Flow', () => {
   test.beforeAll(async () => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY_SECRET;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase configuration');
+      throw new Error('Supabase environment variables not set');
     }
 
     // Initialize Supabase client

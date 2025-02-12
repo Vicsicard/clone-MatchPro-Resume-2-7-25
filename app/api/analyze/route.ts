@@ -31,6 +31,18 @@ export async function POST(request: Request) {
       }
     );
 
+    // Get user ID from token
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      console.error('Invalid token:', userError);
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
+    }
+
     // Get form data
     const formData = await request.formData();
     console.log('Form data keys:', Array.from(formData.keys()));
@@ -38,10 +50,9 @@ export async function POST(request: Request) {
     // Get files and user ID
     const resume = formData.get('resume') as FormDataFile | null;
     const jobDescription = formData.get('jobDescription') as FormDataFile | null;
-    const userId = formData.get('userId');
 
-    if (!resume || !jobDescription || !userId) {
-      const error = `Missing required fields: ${!resume ? 'resume' : ''} ${!jobDescription ? 'jobDescription' : ''} ${!userId ? 'userId' : ''}`;
+    if (!resume || !jobDescription) {
+      const error = `Missing required files: ${!resume ? 'resume' : ''} ${!jobDescription ? 'jobDescription' : ''}`;
       console.error(error);
       return NextResponse.json(
         { error },
@@ -73,11 +84,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get user ID as string
-    const userIdString = userId instanceof Blob ? 
-      await userId.text() : 
-      String(userId);
-
     // Validate text content
     if (!resumeText.trim()) {
       return NextResponse.json(
@@ -98,7 +104,7 @@ export async function POST(request: Request) {
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .insert({
-        user_id: userIdString,
+        user_id: user.id,
         status: 'processing',
         resume_name: resume instanceof File ? resume.name : 'resume.txt',
         job_description_name: jobDescription instanceof File ? jobDescription.name : 'job.txt'

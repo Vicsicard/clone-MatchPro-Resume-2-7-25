@@ -110,6 +110,9 @@ export default function Dashboard() {
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: formData
       });
 
