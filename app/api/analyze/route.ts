@@ -3,7 +3,15 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-type FormDataFile = File | Blob;
+// Initialize Supabase client with service role key
+const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
 
 type AnalysisStatus = 'processing' | 'completed' | 'failed';
 
@@ -21,23 +29,17 @@ interface Analysis {
 
 function sanitizeText(text: string): string {
   return text
-    // Normalize Unicode characters
     .normalize('NFKC')
-    // Remove BOM and other special Unicode characters
     .replace(/[\uFEFF\uFFFF]/g, '')
-    // Replace Unicode quotes with ASCII quotes
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
-    // Replace Unicode dashes with ASCII dashes
     .replace(/[\u2013\u2014]/g, '-')
-    // Replace other problematic characters
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-    // Replace multiple spaces with single space
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-async function readFileAsText(file: FormDataFile): Promise<string> {
+async function readFileAsText(file: File | Blob): Promise<string> {
   try {
     const text = await file.text();
     return sanitizeText(text);
@@ -47,113 +49,90 @@ async function readFileAsText(file: FormDataFile): Promise<string> {
   }
 }
 
-export async function POST(request: Request) {
-  console.log('Starting analysis request...');
+async function generateEmbedding(text: string): Promise<number[]> {
+  if (!process.env.COHERE_API_KEY) {
+    throw new Error('COHERE_API_KEY is not configured');
+  }
 
+  const response = await fetch('https://api.cohere.ai/v1/embed', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.COHERE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      texts: [text],
+      model: 'embed-english-v3.0',
+      input_type: 'search_document'
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Cohere API error: ${error.message}`);
+  }
+
+  const data = await response.json();
+  if (!data.embeddings?.[0]) {
+    throw new Error('Failed to generate embedding');
+  }
+
+  return data.embeddings[0];
+}
+
+function calculateCosineSimilarity(a: number[], b: number[]): number {
+  const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return dotProduct / (magnitudeA * magnitudeB);
+}
+
+export async function POST(request: Request) {
   try {
     // Validate environment variables
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Missing Supabase environment variables');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.COHERE_API_KEY) {
+      throw new Error('Missing required environment variables');
     }
 
     // Get authorization header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      console.error('No Bearer token found');
-      return NextResponse.json(
-        { error: 'No Bearer token found' },
-        { status: 401 }
-      );
+      throw new Error('No Bearer token found');
     }
 
-    // Create Supabase client with service role key
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Create Supabase client
+    if (!supabase) {
+      throw new Error('Failed to initialize Supabase client');
+    }
 
     // Get user ID from token
     const token = authHeader.split(' ')[1];
-    console.log('Verifying token...');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
-    if (userError) {
-      console.error('Invalid token:', userError);
-      return NextResponse.json(
-        { error: `Authentication failed: ${userError.message}` },
-        { status: 401 }
-      );
+    if (userError || !user) {
+      throw new Error(userError?.message || 'User not found');
     }
-
-    if (!user) {
-      console.error('No user found for token');
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 401 }
-      );
-    }
-
-    console.log('User authenticated:', user.id);
 
     // Get form data
     const formData = await request.formData();
-    console.log('Form data keys:', Array.from(formData.keys()));
-
-    // Get files
-    const resume = formData.get('resume') as FormDataFile | null;
-    const jobDescription = formData.get('jobDescription') as FormDataFile | null;
+    const resume = formData.get('resume') as File | null;
+    const jobDescription = formData.get('jobDescription') as File | null;
 
     if (!resume || !jobDescription) {
-      const error = `Missing required files: ${!resume ? 'resume' : ''} ${!jobDescription ? 'jobDescription' : ''}`.trim();
-      console.error(error);
-      return NextResponse.json(
-        { error },
-        { status: 400 }
-      );
+      throw new Error('Missing required files');
     }
 
-    // Read file contents with proper error handling
-    let resumeText: string;
-    let jobDescriptionText: string;
-    
-    try {
-      resumeText = await readFileAsText(resume);
-      jobDescriptionText = await readFileAsText(jobDescription);
-    } catch (error: any) {
-      console.error('Error reading files:', error);
-      return NextResponse.json(
-        { error: 'Failed to read file contents: ' + error.message },
-        { status: 500 }
-      );
-    }
+    // Read and sanitize file contents
+    const [resumeText, jobDescriptionText] = await Promise.all([
+      readFileAsText(resume),
+      readFileAsText(jobDescription)
+    ]);
 
-    // Validate text content
-    if (!resumeText.trim()) {
-      return NextResponse.json(
-        { error: 'Resume file is empty' },
-        { status: 400 }
-      );
-    }
-
-    if (!jobDescriptionText.trim()) {
-      return NextResponse.json(
-        { error: 'Job description file is empty' },
-        { status: 400 }
-      );
+    if (!resumeText.trim() || !jobDescriptionText.trim()) {
+      throw new Error('One or more files are empty');
     }
 
     // Create analysis record
-    console.log('Creating analysis record for user:', user.id);
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .insert([
@@ -168,135 +147,95 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (analysisError) {
-      console.error('Failed to create analysis:', {
-        error: analysisError,
-        message: analysisError.message,
-        details: analysisError.details,
-        hint: analysisError.hint,
-        code: analysisError.code
-      });
-      return NextResponse.json(
-        { error: `Failed to create analysis: ${analysisError.message}` },
-        { status: 500 }
-      );
+    if (analysisError || !analysis) {
+      throw new Error(analysisError?.message || 'Failed to create analysis record');
     }
 
-    if (!analysis) {
-      console.error('No analysis record created');
-      return NextResponse.json(
-        { error: 'Failed to create analysis record' },
-        { status: 500 }
-      );
-    }
+    // Generate embeddings
+    const [resumeEmbedding, jobDescriptionEmbedding] = await Promise.all([
+      generateEmbedding(resumeText),
+      generateEmbedding(jobDescriptionText)
+    ]);
 
-    console.log('Analysis record created:', analysis.id);
-
-    // Create document embeddings records
-    try {
-      console.log('Creating document embeddings...');
-      const { error: embedError } = await supabase
-        .from('document_embeddings')
-        .insert([
-          {
-            content: resumeText,
-            metadata: {
-              type: 'resume',
-              analysis_id: analysis.id,
-              filename: resume instanceof File ? resume.name : 'resume.txt'
-            },
-            created_at: new Date().toISOString()
+    // Store document embeddings
+    const { error: embedError } = await supabase
+      .from('document_embeddings')
+      .insert([
+        {
+          content: resumeText,
+          embedding: resumeEmbedding,
+          metadata: {
+            type: 'resume',
+            analysis_id: analysis.id,
+            filename: resume instanceof File ? resume.name : 'resume.txt'
           },
-          {
-            content: jobDescriptionText,
-            metadata: {
-              type: 'job_description',
-              analysis_id: analysis.id,
-              filename: jobDescription instanceof File ? jobDescription.name : 'job.txt'
-            },
-            created_at: new Date().toISOString()
-          }
-        ]);
-
-      if (embedError) {
-        console.error('Failed to create document embeddings:', {
-          error: embedError,
-          message: embedError.message,
-          details: embedError.details,
-          hint: embedError.hint,
-          code: embedError.code
-        });
-        // Update analysis status to failed
-        await supabase
-          .from('analyses')
-          .update({ 
-            status: 'failed',
-            error: `Failed to store documents: ${embedError.message}`,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', analysis.id);
-
-        return NextResponse.json(
-          { error: `Failed to create document embeddings: ${embedError.message}` },
-          { status: 500 }
-        );
-      }
-
-      console.log('Documents stored successfully');
-
-      // Trigger processing
-      try {
-        console.log('Triggering document processing...');
-        const requestUrl = new URL(request.url);
-        const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-        const processUrl = `${baseUrl}/api/process-analysis?analysisId=${analysis.id}`;
-        console.log('Process URL:', processUrl);
-        
-        const processResponse = await fetch(processUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-          }
-        });
-
-        if (!processResponse.ok) {
-          const error = await processResponse.json();
-          console.error('Failed to trigger processing:', error);
-          // Don't fail the request, just log the error
-        } else {
-          console.log('Processing triggered successfully');
+          created_at: new Date().toISOString()
+        },
+        {
+          content: jobDescriptionText,
+          embedding: jobDescriptionEmbedding,
+          metadata: {
+            type: 'job_description',
+            analysis_id: analysis.id,
+            filename: jobDescription instanceof File ? jobDescription.name : 'job.txt'
+          },
+          created_at: new Date().toISOString()
         }
-      } catch (error) {
-        console.error('Error triggering processing:', error);
-        // Don't fail the request, just log the error
-      }
+      ]);
 
-      return NextResponse.json({
-        message: 'Analysis started',
-        analysisId: analysis.id
-      });
-    } catch (error: any) {
-      console.error('Error storing documents:', error);
-      // Update analysis status to failed
+    if (embedError) {
+      throw new Error(`Failed to store document embeddings: ${embedError.message}`);
+    }
+
+    // Calculate similarity score
+    const similarityScore = calculateCosineSimilarity(resumeEmbedding, jobDescriptionEmbedding);
+
+    // Update analysis with results
+    const { error: updateError } = await supabase
+      .from('analyses')
+      .update({
+        status: 'completed',
+        results: {
+          similarity_score: similarityScore,
+          timestamp: new Date().toISOString()
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', analysis.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update analysis results: ${updateError.message}`);
+    }
+
+    return NextResponse.json({
+      message: 'Analysis completed successfully',
+      analysisId: analysis.id,
+      status: 'completed',
+      similarity_score: similarityScore
+    });
+
+  } catch (error: any) {
+    console.error('Analysis error:', error);
+
+    // If we have an analysis ID, update its status to failed
+    const analysisId = error.analysisId;
+    if (analysisId && supabase) {
       await supabase
         .from('analyses')
-        .update({ 
+        .update({
           status: 'failed',
           error: error.message,
           updated_at: new Date().toISOString()
         })
-        .eq('id', analysis.id);
-
-      return NextResponse.json(
-        { error: 'Failed to store documents: ' + error.message },
-        { status: 500 }
-      );
+        .eq('id', analysisId);
     }
-  } catch (error: any) {
-    console.error('Unexpected error:', error);
+
     return NextResponse.json(
-      { error: error.message || 'An unexpected error occurred' },
-      { status: 500 }
+      { 
+        error: error.message || 'An unexpected error occurred',
+        details: error.details || undefined
+      },
+      { status: error.status || 500 }
     );
   }
 }

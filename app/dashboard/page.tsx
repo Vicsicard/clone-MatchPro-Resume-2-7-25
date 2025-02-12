@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [analysisStatus, setAnalysisStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [statusMessage, setStatusMessage] = useState<string>('');
 
   const router = useRouter();
   const supabase = createClient();
@@ -36,32 +37,49 @@ export default function Dashboard() {
         if (error) {
           console.error('Error fetching analysis:', error);
           setError('Failed to fetch analysis status');
+          setStatusMessage('Error: Failed to fetch analysis status');
           clearInterval(pollInterval);
           return;
         }
 
         if (analysis) {
           setAnalysisStatus(analysis.status);
-          if (analysis.results) {
-            setAnalysisResult(analysis.results);
-          }
-
-          if (analysis.status === 'completed' || analysis.status === 'failed') {
-            clearInterval(pollInterval);
-            if (analysis.status === 'failed') {
-              setError('Analysis failed. Please try again.');
-            }
+          
+          // Update status message based on status
+          switch (analysis.status) {
+            case 'processing':
+              setStatusMessage('Processing your documents...');
+              break;
+            case 'completed':
+              if (analysis.results?.similarity_score) {
+                const score = Math.round(analysis.results.similarity_score * 100);
+                setStatusMessage(`Analysis complete! Match score: ${score}%`);
+              } else {
+                setStatusMessage('Analysis complete!');
+              }
+              setAnalysisResult(analysis.results);
+              clearInterval(pollInterval);
+              break;
+            case 'failed':
+              setStatusMessage(`Analysis failed: ${analysis.error || 'Unknown error'}`);
+              setError(analysis.error || 'Analysis failed');
+              clearInterval(pollInterval);
+              break;
+            default:
+              setStatusMessage('Unknown status');
+              break;
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error polling analysis status:', error);
         setError('Failed to check analysis status');
+        setStatusMessage('Error: Failed to check analysis status');
         clearInterval(pollInterval);
       }
     }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(pollInterval);
-  }, [analysisId]);
+  }, [analysisId, supabase]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -74,7 +92,7 @@ export default function Dashboard() {
     };
 
     checkSession();
-  }, []);
+  }, [router, supabase.auth]);
 
   const handleFileUpload = (type: 'resume' | 'jobDescription', file: File) => {
     setFiles(prev => ({
@@ -85,28 +103,25 @@ export default function Dashboard() {
     setAnalysisId(null);
     setAnalysisStatus(null);
     setAnalysisResult(null);
+    setStatusMessage('');
   };
 
   const handleAnalysis = async () => {
     if (!files.resume || !files.jobDescription) {
       setError('Please upload both resume and job description');
+      setStatusMessage('Error: Please upload both files');
       return;
     }
 
     setLoading(true);
     setError(null);
     setUploadProgress(0);
+    setStatusMessage('Uploading files...');
 
     try {
       const formData = new FormData();
       formData.append('resume', files.resume);
       formData.append('jobDescription', files.jobDescription);
-
-      // Create a timeout to handle hanging requests
-      const timeoutId = setTimeout(() => {
-        setError('Request timed out. Please try again.');
-        setLoading(false);
-      }, 30000); // 30 second timeout
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -116,28 +131,27 @@ export default function Dashboard() {
         body: formData
       });
 
-      clearTimeout(timeoutId);
-
       const data = await response.json();
-      console.log('Analysis response:', { status: response.status, data });
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to analyze files: ${response.status}`);
-      }
-
-      if (!data.analysisId) {
-        throw new Error('No analysis ID returned from server');
+        throw new Error(data.error || 'Failed to analyze documents');
       }
 
       setAnalysisId(data.analysisId);
-      setAnalysisStatus('processing');
-      setFiles({});
-      setUploadProgress(100);
+      setAnalysisStatus(data.status || 'processing');
+      
+      if (data.status === 'completed' && data.similarity_score) {
+        const score = Math.round(data.similarity_score * 100);
+        setStatusMessage(`Analysis complete! Match score: ${score}%`);
+        setAnalysisResult({ similarity_score: data.similarity_score });
+      } else {
+        setStatusMessage('Processing your documents...');
+      }
+
     } catch (error: any) {
       console.error('Analysis error:', error);
-      setError(error.message || 'Failed to analyze files');
-      setAnalysisId(null);
-      setAnalysisStatus(null);
+      setError(error.message || 'Failed to analyze documents');
+      setStatusMessage(`Error: ${error.message || 'Failed to analyze documents'}`);
     } finally {
       setLoading(false);
     }
