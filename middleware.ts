@@ -18,7 +18,8 @@ export const config = {
   ],
 };
 
-const PUBLIC_ROUTES = ['/', '/pricing'];
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['/', '/pricing', '/blog', '/blog/[slug]'];
 
 export async function middleware(req: NextRequest) {
   try {
@@ -31,8 +32,8 @@ export async function middleware(req: NextRequest) {
 
     const pathname = req.nextUrl.pathname;
 
-    // Allow public routes
-    if (PUBLIC_ROUTES.includes(pathname)) {
+    // Allow public routes and any route starting with /blog
+    if (PUBLIC_ROUTES.includes(pathname) || pathname.startsWith('/blog/')) {
       return res;
     }
 
@@ -52,9 +53,8 @@ export async function middleware(req: NextRequest) {
     }
 
     return res;
-  } catch (e) {
-    console.error('Middleware error:', e);
-    // On error, redirect to sign in
+  } catch (error) {
+    console.error('Middleware error:', error);
     return NextResponse.redirect(new URL('/auth/sign-in', req.url));
   }
 }
