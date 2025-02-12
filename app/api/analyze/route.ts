@@ -247,7 +247,9 @@ export async function POST(request: Request) {
       // Trigger processing
       try {
         console.log('Triggering document processing...');
-        const processResponse = await fetch(`${request.nextUrl.origin}/api/process-analysis?analysisId=${analysis.id}`, {
+        const requestUrl = new URL(request.url);
+        const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+        const processResponse = await fetch(`${baseUrl}/api/process-analysis?analysisId=${analysis.id}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
