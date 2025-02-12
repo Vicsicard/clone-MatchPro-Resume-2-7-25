@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
-  const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
@@ -130,7 +130,7 @@ export default function Dashboard() {
       }
 
       setAnalysisId(data.analysisId);
-      setAnalysisStatus('pending');
+      setAnalysisStatus('processing');
       setFiles({});
       setUploadProgress(100);
     } catch (error: any) {

@@ -5,6 +5,20 @@ export const runtime = 'edge';
 
 type FormDataFile = File | Blob;
 
+type AnalysisStatus = 'processing' | 'completed' | 'failed';
+
+interface Analysis {
+  id: string;
+  user_id: string;
+  status: AnalysisStatus;
+  resume_name: string;
+  job_description_name: string;
+  created_at: string;
+  updated_at?: string;
+  error?: string;
+  results?: any;
+}
+
 async function readFileAsText(file: FormDataFile): Promise<string> {
   try {
     const text = await file.text();
@@ -128,7 +142,7 @@ export async function POST(request: Request) {
       .insert([
         {
           user_id: user.id,
-          status: 'pending',
+          status: 'processing',
           resume_name: resume instanceof File ? resume.name : 'resume.txt',
           job_description_name: jobDescription instanceof File ? jobDescription.name : 'job.txt',
           created_at: new Date().toISOString()
