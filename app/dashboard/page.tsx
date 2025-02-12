@@ -288,6 +288,7 @@ export default function Dashboard() {
               {/* Results */}
               {analysisResult && (
                 <div className="mt-8">
+                  {console.log('Analysis Result:', analysisResult)}
                   <h2 className="text-xl font-bold mb-4">Analysis Results</h2>
                   <div className="bg-white shadow rounded-lg p-6">
                     <div className="mb-4">
@@ -297,38 +298,49 @@ export default function Dashboard() {
                           <div className="w-24 h-2 bg-gray-200 rounded-full mr-2">
                             <div 
                               className={`h-2 rounded-full ${
-                                analysisResult.similarity_score >= 0.7 
-                                  ? 'bg-green-500' 
-                                  : analysisResult.similarity_score >= 0.5 
-                                    ? 'bg-yellow-500' 
-                                    : 'bg-red-500'
+                                analysisResult.similarity_score * 100 >= 80
+                                  ? 'bg-green-500'
+                                  : analysisResult.similarity_score * 100 >= 60
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
                               }`}
-                              style={{ width: `${Math.round(analysisResult.similarity_score * 100)}%` }}
-                            ></div>
+                              style={{
+                                width: `${analysisResult.similarity_score * 100}%`,
+                              }}
+                            />
                           </div>
-                          <span className={`font-bold ${
-                            analysisResult.similarity_score >= 0.7 
-                              ? 'text-green-600' 
-                              : analysisResult.similarity_score >= 0.5 
-                                ? 'text-yellow-600' 
-                                : 'text-red-600'
-                          }`}>
+                          <span className="text-gray-900 font-bold">
                             {Math.round(analysisResult.similarity_score * 100)}%
                           </span>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        {analysisResult.similarity_score >= 0.7 
-                          ? 'Strong match! Your resume aligns well with the job description.'
-                          : analysisResult.similarity_score >= 0.5 
-                            ? 'Moderate match. Consider updating your resume to better align with the job requirements.'
-                            : 'Low match. We recommend tailoring your resume to better match the job description.'}
+                      <p className="text-gray-600">
+                        {analysisResult.similarity_score * 100 >= 80
+                          ? 'Excellent match! Your resume is well-aligned with the job requirements.'
+                          : analysisResult.similarity_score * 100 >= 60
+                          ? 'Moderate match. Consider updating your resume to better align with the job requirements.'
+                          : 'Low match. We recommend significant updates to your resume to better match the job requirements.'}
                       </p>
                     </div>
-                    
-                    <div className="text-sm text-gray-500">
-                      Analysis completed at: {new Date(analysisResult.timestamp).toLocaleString()}
-                    </div>
+
+                    {/* Improvement Suggestions Section */}
+                    {(analysisResult.results?.improvement_suggestions || analysisResult.improvement_suggestions) && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Suggested Improvements</h3>
+                        <div className="space-y-3">
+                          {(analysisResult.results?.improvement_suggestions || analysisResult.improvement_suggestions)?.map((suggestion: string, index: number) => (
+                            <div key={index} className="flex items-start space-x-2 bg-blue-50 p-3 rounded-lg">
+                              <div className="flex-shrink-0 mt-1">
+                                <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
+                              <p className="text-sm text-gray-700">{suggestion}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

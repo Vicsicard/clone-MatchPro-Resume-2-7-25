@@ -91,6 +91,69 @@ function calculateCosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB);
 }
 
+async function generateImprovementSuggestions(
+  resumeText: string,
+  jobDescriptionText: string,
+  similarityScore: number
+): Promise<string[]> {
+  const prompt = `
+As an AI resume expert, analyze this job description and resume, then provide 3 specific suggestions to improve the resume's match with the job requirements.
+Focus on actionable improvements that will increase the current match score of ${Math.round(similarityScore * 100)}%.
+
+Job Description:
+${jobDescriptionText}
+
+Resume:
+${resumeText}
+
+Provide exactly 3 clear, specific suggestions, each starting with "- ". Focus on content alignment, skills highlighting, and experience presentation.
+`;
+
+  try {
+    const response = await fetch('https://api.cohere.ai/v1/generate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.COHERE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'command',
+        prompt,
+        max_tokens: 300,
+        temperature: 0.7,
+        stop_sequences: ["\n\n"],
+        num_generations: 1
+      })
+    });
+
+    const data = await response.json();
+    if (!data.generations?.[0]?.text) {
+      throw new Error('Failed to generate suggestions');
+    }
+
+    // Extract suggestions (lines starting with "- ")
+    const suggestions = data.generations[0].text
+      .split('\n')
+      .filter((line: string) => line.trim().startsWith('- '))
+      .map((line: string) => line.trim().substring(2)) // Remove "- " prefix
+      .slice(0, 3); // Ensure we only get 3 suggestions
+
+    return suggestions.length ? suggestions : [
+      'Focus on highlighting relevant skills that match the job requirements',
+      'Quantify your achievements with specific metrics and results',
+      'Align your experience descriptions with the job responsibilities'
+    ];
+  } catch (error) {
+    console.error('Error generating suggestions:', error);
+    // Fallback suggestions if API call fails
+    return [
+      'Focus on highlighting relevant skills that match the job requirements',
+      'Quantify your achievements with specific metrics and results',
+      'Align your experience descriptions with the job responsibilities'
+    ];
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Validate environment variables
@@ -194,6 +257,15 @@ export async function POST(request: Request) {
     // Calculate similarity score
     const similarityScore = calculateCosineSimilarity(resumeEmbedding, jobDescriptionEmbedding);
 
+    // Generate improvement suggestions
+    const improvementSuggestions = await generateImprovementSuggestions(
+      resumeText,
+      jobDescriptionText,
+      similarityScore
+    );
+
+    console.log('Generated suggestions:', improvementSuggestions);
+
     // Update analysis with results
     const { error: updateError } = await supabase
       .from('analyses')
@@ -201,21 +273,21 @@ export async function POST(request: Request) {
         status: 'completed',
         results: {
           similarity_score: similarityScore,
+          improvement_suggestions: improvementSuggestions,
           timestamp: new Date().toISOString()
         },
         updated_at: new Date().toISOString()
       })
       .eq('id', analysis.id);
 
-    if (updateError) {
-      throw new Error(`Failed to update analysis results: ${updateError.message}`);
-    }
+    console.log('Update result:', { error: updateError });
 
     return NextResponse.json({
       message: 'Analysis completed successfully',
       analysisId: analysis.id,
       status: 'completed',
-      similarity_score: similarityScore
+      similarity_score: similarityScore,
+      improvement_suggestions: improvementSuggestions
     });
 
   } catch (error: any) {
