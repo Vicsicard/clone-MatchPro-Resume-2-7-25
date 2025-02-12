@@ -151,9 +151,27 @@ export default function Pricing() {
             <div className="p-6">
               <h3 className="text-xl font-semibold text-gray-900">Free Trial</h3>
               <p className="mt-4 text-gray-500">Perfect for trying out our services</p>
+              <ul role="list" className="mt-6 space-y-4">
+                <li className="flex space-x-3">
+                  <svg
+                    className="h-5 w-5 flex-shrink-0 text-green-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-sm text-gray-500">24-hour access to all features</span>
+                </li>
+              </ul>
               <p className="mt-8">
                 <span className="text-4xl font-extrabold text-gray-900">$0</span>
-                <span className="text-base font-medium text-gray-500">/30 days</span>
+                <span className="text-base font-medium text-gray-500">/24 hours</span>
               </p>
               <button
                 onClick={handleFreeTrial}

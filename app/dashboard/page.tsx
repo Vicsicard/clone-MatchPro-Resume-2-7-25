@@ -94,6 +94,12 @@ export default function Dashboard() {
     checkSession();
   }, [router, supabase.auth]);
 
+  useEffect(() => {
+    if (analysisResult) {
+      console.log('Analysis Result:', analysisResult);
+    }
+  }, [analysisResult]);
+
   const handleFileUpload = (type: 'resume' | 'jobDescription', file: File) => {
     setFiles(prev => ({
       ...prev,
@@ -288,7 +294,6 @@ export default function Dashboard() {
               {/* Results */}
               {analysisResult && (
                 <div className="mt-8">
-                  {console.log('Analysis Result:', analysisResult)}
                   <h2 className="text-xl font-bold mb-4">Analysis Results</h2>
                   <div className="bg-white shadow rounded-lg p-6">
                     <div className="mb-4">
