@@ -62,8 +62,9 @@ async function generateEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       texts: [text],
-      model: 'embed-english-v3.0',
-      input_type: 'search_document'
+      model: 'embed-multilingual-v3.0',
+      input_type: 'search_document',
+      truncate: 'END'
     })
   });
 
@@ -76,6 +77,9 @@ async function generateEmbedding(text: string): Promise<number[]> {
   if (!data.embeddings?.[0]) {
     throw new Error('Failed to generate embedding');
   }
+
+  // Log the embedding dimensions
+  console.log('Generated embedding dimensions:', data.embeddings[0].length);
 
   return data.embeddings[0];
 }
