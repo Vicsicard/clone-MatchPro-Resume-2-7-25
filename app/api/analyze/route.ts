@@ -19,11 +19,28 @@ interface Analysis {
   results?: any;
 }
 
+function sanitizeText(text: string): string {
+  return text
+    // Normalize Unicode characters
+    .normalize('NFKC')
+    // Remove BOM and other special Unicode characters
+    .replace(/[\uFEFF\uFFFF]/g, '')
+    // Replace Unicode quotes with ASCII quotes
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    // Replace Unicode dashes with ASCII dashes
+    .replace(/[\u2013\u2014]/g, '-')
+    // Replace other problematic characters
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    // Replace multiple spaces with single space
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function readFileAsText(file: FormDataFile): Promise<string> {
   try {
     const text = await file.text();
-    // Normalize text to handle different Unicode representations
-    return text.normalize('NFKC').replace(/[\uFEFF\uFFFF]/g, '');
+    return sanitizeText(text);
   } catch (error) {
     console.error('Error reading file:', error);
     throw new Error('Failed to read file content');
@@ -177,6 +194,7 @@ export async function POST(request: Request) {
 
     // Create document embeddings records
     try {
+      console.log('Creating document embeddings...');
       const { error: embedError } = await supabase
         .from('document_embeddings')
         .insert([
@@ -184,7 +202,8 @@ export async function POST(request: Request) {
             content: resumeText,
             metadata: {
               type: 'resume',
-              analysis_id: analysis.id
+              analysis_id: analysis.id,
+              filename: resume instanceof File ? resume.name : 'resume.txt'
             },
             created_at: new Date().toISOString()
           },
@@ -192,7 +211,8 @@ export async function POST(request: Request) {
             content: jobDescriptionText,
             metadata: {
               type: 'job_description',
-              analysis_id: analysis.id
+              analysis_id: analysis.id,
+              filename: jobDescription instanceof File ? jobDescription.name : 'job.txt'
             },
             created_at: new Date().toISOString()
           }
