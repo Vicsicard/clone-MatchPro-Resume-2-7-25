@@ -5,7 +5,12 @@ export const runtime = 'edge';
 
 // Initialize Supabase client with service role key
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      })
     : null;
 
 interface DocumentEmbedding {
@@ -25,6 +30,11 @@ interface CohereEmbedResponse {
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {
+  if (!process.env.COHERE_API_KEY) {
+    throw new Error('COHERE_API_KEY is not configured');
+  }
+
+  console.log('Calling Cohere API...');
   const response = await fetch('https://api.cohere.ai/v1/embed', {
     method: 'POST',
     headers: {
@@ -38,12 +48,19 @@ async function generateEmbedding(text: string): Promise<number[]> {
     })
   });
 
+  console.log('Cohere API response status:', response.status);
   if (!response.ok) {
     const error = await response.json();
+    console.error('Cohere API error:', error);
     throw new Error(`Cohere API error: ${error.message}`);
   }
 
   const data = await response.json();
+  console.log('Cohere API response:', {
+    hasEmbeddings: !!data.embeddings,
+    embeddingsLength: data.embeddings?.[0]?.length
+  });
+
   if (!data.embeddings?.[0]) {
     throw new Error('Failed to generate embedding');
   }
@@ -52,6 +69,8 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 export async function POST(req: Request) {
+  console.log('Starting process-analysis...');
+  
   // Return early if services are not configured
   if (!supabase) {
     console.warn('Required services are not configured');
@@ -67,6 +86,7 @@ export async function POST(req: Request) {
     const analysisId = url.searchParams.get('analysisId');
     
     if (!analysisId) {
+      console.error('No analysisId provided');
       return NextResponse.json(
         { error: 'Analysis ID is required' },
         { status: 400 }
@@ -90,7 +110,14 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log('Found analysis:', {
+      id: analysis.id,
+      status: analysis.status,
+      created_at: analysis.created_at
+    });
+
     // Get the document embeddings
+    console.log('Fetching documents...');
     const { data: documents, error: documentsError } = await supabase
       .from('document_embeddings')
       .select('*')
@@ -104,6 +131,11 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log('Found documents:', {
+      count: documents?.length,
+      types: documents?.map(d => d.metadata.type)
+    });
+
     if (!documents || documents.length !== 2) {
       console.error('Invalid number of documents:', documents?.length);
       return NextResponse.json(
@@ -116,7 +148,10 @@ export async function POST(req: Request) {
     const jobDescription = documents.find(d => d.metadata.type === 'job_description');
 
     if (!resume || !jobDescription) {
-      console.error('Missing required documents');
+      console.error('Missing required documents:', {
+        hasResume: !!resume,
+        hasJobDescription: !!jobDescription
+      });
       return NextResponse.json(
         { error: 'Missing required documents' },
         { status: 400 }
@@ -127,12 +162,16 @@ export async function POST(req: Request) {
 
     // Generate embeddings for both documents
     try {
-      const [resumeEmbedding, jobEmbedding] = await Promise.all([
-        generateEmbedding(resume.content),
-        generateEmbedding(jobDescription.content)
-      ]);
+      console.log('Generating resume embedding...');
+      const resumeEmbedding = await generateEmbedding(resume.content);
+      console.log('Resume embedding generated, length:', resumeEmbedding.length);
+
+      console.log('Generating job description embedding...');
+      const jobEmbedding = await generateEmbedding(jobDescription.content);
+      console.log('Job description embedding generated, length:', jobEmbedding.length);
 
       // Update document embeddings with vectors
+      console.log('Updating documents with embeddings...');
       const { error: updateError } = await supabase
         .from('document_embeddings')
         .upsert([
@@ -149,13 +188,17 @@ export async function POST(req: Request) {
         ]);
 
       if (updateError) {
+        console.error('Error updating documents:', updateError);
         throw updateError;
       }
 
       // Calculate similarity score
+      console.log('Calculating similarity score...');
       const similarity = calculateCosineSimilarity(resumeEmbedding, jobEmbedding);
+      console.log('Similarity score:', similarity);
 
       // Update analysis with results
+      console.log('Updating analysis with results...');
       const { error: resultError } = await supabase
         .from('analyses')
         .update({
@@ -169,9 +212,11 @@ export async function POST(req: Request) {
         .eq('id', analysisId);
 
       if (resultError) {
+        console.error('Error updating analysis:', resultError);
         throw resultError;
       }
 
+      console.log('Analysis completed successfully');
       return NextResponse.json({
         message: 'Analysis completed successfully',
         similarity_score: similarity
@@ -181,6 +226,7 @@ export async function POST(req: Request) {
       console.error('Error processing documents:', error);
       
       // Update analysis status to failed
+      console.log('Updating analysis status to failed...');
       await supabase
         .from('analyses')
         .update({

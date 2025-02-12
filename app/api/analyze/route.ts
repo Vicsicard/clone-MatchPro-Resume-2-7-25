@@ -249,7 +249,10 @@ export async function POST(request: Request) {
         console.log('Triggering document processing...');
         const requestUrl = new URL(request.url);
         const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-        const processResponse = await fetch(`${baseUrl}/api/process-analysis?analysisId=${analysis.id}`, {
+        const processUrl = `${baseUrl}/api/process-analysis?analysisId=${analysis.id}`;
+        console.log('Process URL:', processUrl);
+        
+        const processResponse = await fetch(processUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
@@ -260,6 +263,8 @@ export async function POST(request: Request) {
           const error = await processResponse.json();
           console.error('Failed to trigger processing:', error);
           // Don't fail the request, just log the error
+        } else {
+          console.log('Processing triggered successfully');
         }
       } catch (error) {
         console.error('Error triggering processing:', error);
