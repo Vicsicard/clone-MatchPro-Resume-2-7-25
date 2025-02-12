@@ -20,6 +20,15 @@ export async function POST(request: Request) {
   console.log('Starting analysis request...');
 
   try {
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase environment variables');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     // Get authorization header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -32,8 +41,8 @@ export async function POST(request: Request) {
 
     // Create Supabase client with service role key
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -44,15 +53,26 @@ export async function POST(request: Request) {
 
     // Get user ID from token
     const token = authHeader.split(' ')[1];
+    console.log('Verifying token...');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
-    if (userError || !user) {
+    if (userError) {
       console.error('Invalid token:', userError);
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { error: `Authentication failed: ${userError.message}` },
         { status: 401 }
       );
     }
+
+    if (!user) {
+      console.error('No user found for token');
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      );
+    }
+
+    console.log('User authenticated:', user.id);
 
     // Get form data
     const formData = await request.formData();
@@ -63,7 +83,7 @@ export async function POST(request: Request) {
     const jobDescription = formData.get('jobDescription') as FormDataFile | null;
 
     if (!resume || !jobDescription) {
-      const error = `Missing required files: ${!resume ? 'resume' : ''} ${!jobDescription ? 'jobDescription' : ''}`;
+      const error = `Missing required files: ${!resume ? 'resume' : ''} ${!jobDescription ? 'jobDescription' : ''}`.trim();
       console.error(error);
       return NextResponse.json(
         { error },
@@ -102,6 +122,7 @@ export async function POST(request: Request) {
     }
 
     // Create analysis record
+    console.log('Creating analysis record for user:', user.id);
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .insert([
@@ -109,19 +130,36 @@ export async function POST(request: Request) {
           user_id: user.id,
           status: 'pending',
           resume_name: resume instanceof File ? resume.name : 'resume.txt',
-          job_description_name: jobDescription instanceof File ? jobDescription.name : 'job.txt'
+          job_description_name: jobDescription instanceof File ? jobDescription.name : 'job.txt',
+          created_at: new Date().toISOString()
         }
       ])
       .select()
       .single();
 
     if (analysisError) {
-      console.error('Failed to create analysis:', analysisError);
+      console.error('Failed to create analysis:', {
+        error: analysisError,
+        message: analysisError.message,
+        details: analysisError.details,
+        hint: analysisError.hint,
+        code: analysisError.code
+      });
       return NextResponse.json(
-        { error: 'Failed to create analysis' },
+        { error: `Failed to create analysis: ${analysisError.message}` },
         { status: 500 }
       );
     }
+
+    if (!analysis) {
+      console.error('No analysis record created');
+      return NextResponse.json(
+        { error: 'Failed to create analysis record' },
+        { status: 500 }
+      );
+    }
+
+    console.log('Analysis record created:', analysis.id);
 
     // Create document embeddings records
     try {
@@ -133,31 +171,44 @@ export async function POST(request: Request) {
             metadata: {
               type: 'resume',
               analysis_id: analysis.id
-            }
+            },
+            created_at: new Date().toISOString()
           },
           {
             content: jobDescriptionText,
             metadata: {
               type: 'job_description',
               analysis_id: analysis.id
-            }
+            },
+            created_at: new Date().toISOString()
           }
         ]);
 
       if (embedError) {
-        console.error('Failed to create document embeddings:', embedError);
+        console.error('Failed to create document embeddings:', {
+          error: embedError,
+          message: embedError.message,
+          details: embedError.details,
+          hint: embedError.hint,
+          code: embedError.code
+        });
         // Update analysis status to failed
         await supabase
           .from('analyses')
-          .update({ status: 'failed', error: 'Failed to store documents' })
+          .update({ 
+            status: 'failed',
+            error: `Failed to store documents: ${embedError.message}`,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', analysis.id);
 
         return NextResponse.json(
-          { error: 'Failed to create document embeddings' },
+          { error: `Failed to create document embeddings: ${embedError.message}` },
           { status: 500 }
         );
       }
 
+      console.log('Documents stored successfully');
       return NextResponse.json({
         message: 'Analysis started',
         analysisId: analysis.id
@@ -167,7 +218,11 @@ export async function POST(request: Request) {
       // Update analysis status to failed
       await supabase
         .from('analyses')
-        .update({ status: 'failed', error: error.message })
+        .update({ 
+          status: 'failed',
+          error: error.message,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', analysis.id);
 
       return NextResponse.json(

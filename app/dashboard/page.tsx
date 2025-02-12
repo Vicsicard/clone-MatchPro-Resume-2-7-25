@@ -119,13 +119,18 @@ export default function Dashboard() {
       clearTimeout(timeoutId);
 
       const data = await response.json();
+      console.log('Analysis response:', { status: response.status, data });
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to analyze files');
+        throw new Error(data.error || `Failed to analyze files: ${response.status}`);
+      }
+
+      if (!data.analysisId) {
+        throw new Error('No analysis ID returned from server');
       }
 
       setAnalysisId(data.analysisId);
-      setAnalysisStatus('processing');
+      setAnalysisStatus('pending');
       setFiles({});
       setUploadProgress(100);
     } catch (error: any) {
