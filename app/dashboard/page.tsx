@@ -287,11 +287,49 @@ export default function Dashboard() {
 
               {/* Results */}
               {analysisResult && (
-                <div className="bg-white p-6 rounded-lg border border-gray-200" data-testid="analysis-results">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Analysis Results</h2>
-                  <pre className="bg-gray-50 p-4 rounded-lg overflow-auto max-h-96">
-                    {JSON.stringify(analysisResult, null, 2)}
-                  </pre>
+                <div className="mt-8">
+                  <h2 className="text-xl font-bold mb-4">Analysis Results</h2>
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-700 font-semibold">Match Score:</span>
+                        <div className="flex items-center">
+                          <div className="w-24 h-2 bg-gray-200 rounded-full mr-2">
+                            <div 
+                              className={`h-2 rounded-full ${
+                                analysisResult.similarity_score >= 0.7 
+                                  ? 'bg-green-500' 
+                                  : analysisResult.similarity_score >= 0.5 
+                                    ? 'bg-yellow-500' 
+                                    : 'bg-red-500'
+                              }`}
+                              style={{ width: `${Math.round(analysisResult.similarity_score * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className={`font-bold ${
+                            analysisResult.similarity_score >= 0.7 
+                              ? 'text-green-600' 
+                              : analysisResult.similarity_score >= 0.5 
+                                ? 'text-yellow-600' 
+                                : 'text-red-600'
+                          }`}>
+                            {Math.round(analysisResult.similarity_score * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {analysisResult.similarity_score >= 0.7 
+                          ? 'Strong match! Your resume aligns well with the job description.'
+                          : analysisResult.similarity_score >= 0.5 
+                            ? 'Moderate match. Consider updating your resume to better align with the job requirements.'
+                            : 'Low match. We recommend tailoring your resume to better match the job description.'}
+                      </p>
+                    </div>
+                    
+                    <div className="text-sm text-gray-500">
+                      Analysis completed at: {new Date(analysisResult.timestamp).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
