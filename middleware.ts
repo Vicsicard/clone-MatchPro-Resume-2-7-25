@@ -19,7 +19,14 @@ export const config = {
 };
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/', '/pricing', '/blog', '/blog/[slug]'];
+const PUBLIC_ROUTES = [
+  '/', 
+  '/pricing', 
+  '/blog', 
+  '/about',
+  '/privacy',
+  '/terms'
+];
 
 export async function middleware(req: NextRequest) {
   try {
