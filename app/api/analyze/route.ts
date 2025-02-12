@@ -243,6 +243,27 @@ export async function POST(request: Request) {
       }
 
       console.log('Documents stored successfully');
+
+      // Trigger processing
+      try {
+        console.log('Triggering document processing...');
+        const processResponse = await fetch(`${request.nextUrl.origin}/api/process-analysis?analysisId=${analysis.id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          }
+        });
+
+        if (!processResponse.ok) {
+          const error = await processResponse.json();
+          console.error('Failed to trigger processing:', error);
+          // Don't fail the request, just log the error
+        }
+      } catch (error) {
+        console.error('Error triggering processing:', error);
+        // Don't fail the request, just log the error
+      }
+
       return NextResponse.json({
         message: 'Analysis started',
         analysisId: analysis.id
