@@ -235,7 +235,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
             }}
           >
             {post.content
-              .replace(/<p><strong>About <\/strong>.*?<\/p>/s, '')
+              .replace(/<p><strong>About <\/strong>[\s\S]*?<\/p>/, '')
               .split('About MatchPro Resume')[0]
               .trim()}
           </ReactMarkdown>
