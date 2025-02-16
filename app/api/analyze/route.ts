@@ -97,8 +97,8 @@ async function generateImprovementSuggestions(
   similarityScore: number
 ): Promise<string[]> {
   const prompt = `
-As an AI resume expert, analyze this job description and resume, then provide 3 specific suggestions to improve the resume's match with the job requirements.
-Focus on actionable improvements that will increase the current match score of ${Math.round(similarityScore * 100)}%.
+As an expert resume optimization AI, analyze this job description and resume to provide 3 highly specific, actionable suggestions to improve the resume's match with the job requirements.
+Current match score: ${Math.round(similarityScore * 100)}%
 
 Job Description:
 ${jobDescriptionText}
@@ -106,8 +106,18 @@ ${jobDescriptionText}
 Resume:
 ${resumeText}
 
-Provide exactly 3 clear, specific suggestions, each starting with "- ". Focus on content alignment, skills highlighting, and experience presentation.
-`;
+Provide exactly 3 suggestions, focusing on different aspects:
+1. Skills and Keywords: Identify specific missing skills or keywords from the job description that should be added to the resume
+2. Experience and Achievements: Point out specific achievements or experiences that could be better quantified or aligned with job requirements
+3. Format and Structure: Suggest specific structural changes to better highlight relevant experience or skills
+
+Format each suggestion as a JSON object with these fields:
+- category: The category of the suggestion (skills, experience, or format)
+- suggestion: The specific change to make
+- rationale: Why this change will improve the match
+- implementation: How to implement this change
+
+Return only the JSON array with exactly 3 suggestions.`;
 
   try {
     const response = await fetch('https://api.cohere.ai/v1/generate', {
@@ -119,10 +129,10 @@ Provide exactly 3 clear, specific suggestions, each starting with "- ". Focus on
       body: JSON.stringify({
         model: 'command',
         prompt,
-        max_tokens: 300,
+        max_tokens: 800,
         temperature: 0.7,
-        stop_sequences: ["\n\n"],
-        num_generations: 1
+        num_generations: 1,
+        return_likelihoods: 'NONE'
       })
     });
 
@@ -131,25 +141,47 @@ Provide exactly 3 clear, specific suggestions, each starting with "- ". Focus on
       throw new Error('Failed to generate suggestions');
     }
 
-    // Extract suggestions (lines starting with "- ")
+    try {
+      const suggestions = JSON.parse(data.generations[0].text);
+      if (Array.isArray(suggestions) && suggestions.length === 3) {
+        return suggestions.map(s => 
+          `${s.category.toUpperCase()}: ${s.suggestion}\nWhy: ${s.rationale}\nHow: ${s.implementation}`
+        );
+      }
+    } catch (e) {
+      console.error('Error parsing suggestions JSON:', e);
+    }
+
+    // Fallback to extracting suggestions from text if JSON parsing fails
     const suggestions = data.generations[0].text
       .split('\n')
-      .filter((line: string) => line.trim().startsWith('- '))
-      .map((line: string) => line.trim().substring(2)) // Remove "- " prefix
-      .slice(0, 3); // Ensure we only get 3 suggestions
+      .filter((line: string) => line.trim().startsWith('{') || line.trim().startsWith('['))
+      .join('')
+      .replace(/\n/g, ' ');
 
-    return suggestions.length ? suggestions : [
-      'Focus on highlighting relevant skills that match the job requirements',
-      'Quantify your achievements with specific metrics and results',
-      'Align your experience descriptions with the job responsibilities'
+    try {
+      const parsedSuggestions = JSON.parse(suggestions);
+      if (Array.isArray(parsedSuggestions) && parsedSuggestions.length === 3) {
+        return parsedSuggestions.map(s => 
+          `${s.category.toUpperCase()}: ${s.suggestion}\nWhy: ${s.rationale}\nHow: ${s.implementation}`
+        );
+      }
+    } catch (e) {
+      console.error('Error parsing cleaned suggestions JSON:', e);
+    }
+
+    // Final fallback if all parsing attempts fail
+    return [
+      'SKILLS: Add specific keywords from the job description that are missing in your resume.\nWhy: Direct keyword matches improve ATS scoring.\nHow: Review the job description and add missing relevant skills to your skills section.',
+      'EXPERIENCE: Quantify your achievements with specific metrics.\nWhy: Quantified achievements demonstrate impact.\nHow: Add numbers, percentages, or other metrics to your accomplishments.',
+      'FORMAT: Restructure your resume to prioritize relevant experience.\nWhy: Proper structure improves readability.\nHow: Move most relevant experience sections to the top of your resume.'
     ];
   } catch (error) {
     console.error('Error generating suggestions:', error);
-    // Fallback suggestions if API call fails
     return [
-      'Focus on highlighting relevant skills that match the job requirements',
-      'Quantify your achievements with specific metrics and results',
-      'Align your experience descriptions with the job responsibilities'
+      'SKILLS: Add specific keywords from the job description that are missing in your resume.\nWhy: Direct keyword matches improve ATS scoring.\nHow: Review the job description and add missing relevant skills to your skills section.',
+      'EXPERIENCE: Quantify your achievements with specific metrics.\nWhy: Quantified achievements demonstrate impact.\nHow: Add numbers, percentages, or other metrics to your accomplishments.',
+      'FORMAT: Restructure your resume to prioritize relevant experience.\nWhy: Proper structure improves readability.\nHow: Move most relevant experience sections to the top of your resume.'
     ];
   }
 }
