@@ -17,47 +17,65 @@ export default function Pricing() {
     setDebugInfo(null);
 
     try {
+      console.log('Getting session...');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session:', session);
       
       if (!session) {
-        throw new Error('Please sign in first');
+        console.log('No session, redirecting to login...');
+        router.push('/auth/login');
+        return;
       }
 
       // Check if user already has an active subscription
-      const { data: existingSubscription } = await supabase
+      console.log('Checking existing subscription...');
+      const { data: existingSubscription, error: subError } = await supabase
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('is_active', true)
         .single();
 
+      console.log('Existing subscription:', existingSubscription);
+      if (subError) console.log('Subscription check error:', subError);
+
       // If user already has an active subscription, redirect to dashboard
       if (existingSubscription) {
+        console.log('User has active subscription, redirecting to dashboard...');
         router.push('/dashboard');
         return;
       }
 
       // Call our API route to create new subscription
-      const response = await fetch('/api/start-trial', {
+      console.log('Creating new subscription...');
+      const response = await fetch('http://localhost:3002/api/start-trial', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           subscriptionType: 'free'
         }),
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to start free trial');
       }
 
+      // Force a router refresh and redirect
+      console.log('Success! Redirecting to dashboard...');
+      router.refresh();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for refresh
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Free trial error:', error);
       setError(error.message);
+      setDebugInfo(error);
     } finally {
       setLoading(false);
     }
@@ -76,7 +94,7 @@ export default function Pricing() {
       }
 
       // Create checkout session
-      const response = await fetch('/api/create-checkout-session', {
+      const response = await fetch('http://localhost:3002/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -77,10 +77,10 @@ export default function Home() {
           </p>
           <div className="flex items-center justify-center space-x-4 mb-10">
             <Link 
-              href="/auth/sign-up"
+              href="/upload"
               className="bg-[#2563eb] text-white px-7 py-3 rounded-lg text-[15px] font-medium hover:bg-blue-700"
             >
-              Get Started Free
+              Upload Resume
             </Link>
             <Link 
               href="/pricing"

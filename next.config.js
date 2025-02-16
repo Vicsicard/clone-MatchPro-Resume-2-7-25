@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
-  poweredByHeader: false,
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+  webpack: (config) => {
+    config.externals = [...config.externals, { canvas: 'canvas' }];  // required for html-pdf
+    return config;
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['pdf-parse', 'mammoth'],
   }
 };
 

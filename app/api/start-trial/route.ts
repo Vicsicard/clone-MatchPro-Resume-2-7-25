@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/app/supabase/server';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
@@ -18,12 +19,20 @@ export async function POST(request: Request) {
     }
 
     // Check if user already has an active subscription
-    const { data: existingSubscription } = await supabase
+    const { data: existingSubscription, error: subscriptionError } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', session.user.id)
       .eq('is_active', true)
       .single();
+
+    if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+      console.error('Error checking subscription:', subscriptionError);
+      return NextResponse.json(
+        { error: 'Failed to check subscription status' },
+        { status: 500 }
+      );
+    }
 
     if (existingSubscription) {
       return NextResponse.json(
@@ -43,28 +52,37 @@ export async function POST(request: Request) {
     }
 
     // Insert new subscription
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('user_subscriptions')
       .insert({
         user_id: session.user.id,
         subscription_type: subscriptionType,
         trial_end: endDate.toISOString(),
-        is_active: true
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
-    if (error) {
-      console.error('Error creating subscription:', error);
+    if (insertError) {
+      console.error('Error creating subscription:', insertError);
       return NextResponse.json(
-        { error: 'Failed to create subscription' },
+        { error: 'Failed to create subscription', details: insertError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    // Return success with subscription details
+    return NextResponse.json({
+      success: true,
+      subscription: {
+        type: subscriptionType,
+        endDate: endDate.toISOString()
+      }
+    });
   } catch (error) {
     console.error('Error in start-trial:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

@@ -1,0 +1,35 @@
+JOHN DOE
+123 Main Street, City, State 12345
+Phone: (555) 123-4567
+Email: john.doe@email.com
+
+PROFESSIONAL SUMMARY
+Experienced software developer with 5 years of experience in web development.
+
+EXPERIENCE
+Senior Software Developer
+ABC Tech, City, State
+2020 - Present
+- Developed web applications using React and Node.js
+- Managed team of 3 junior developers
+- Implemented CI/CD pipeline
+
+Software Developer
+XYZ Solutions
+2018 - 2020
+- Built RESTful APIs using Express.js
+- Maintained MySQL databases
+- Collaborated with UX team
+
+EDUCATION
+Bachelor of Science in Computer Science
+State University
+2014 - 2018
+
+SKILLS
+- JavaScript/TypeScript
+- React.js
+- Node.js
+- Express.js
+- Git
+- MySQL

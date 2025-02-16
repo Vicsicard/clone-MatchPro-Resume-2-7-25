@@ -12,9 +12,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      * - auth routes
-     * - api routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/|auth/|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|auth/).*)',
   ],
 };
 
@@ -28,40 +27,60 @@ const PUBLIC_ROUTES = [
   '/terms'
 ];
 
+// API routes that don't require subscription check
+const PUBLIC_API_ROUTES = [
+  '/api/auth',
+  '/api/start-trial',
+  '/api/create-checkout-session',
+  '/api/webhook',
+  '/api/health'
+];
+
 export async function middleware(req: NextRequest) {
   try {
     const res = NextResponse.next();
     const supabase = createMiddlewareClient({ req, res });
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
     const pathname = req.nextUrl.pathname;
 
-    // Allow public routes and any route starting with /blog
+    // Skip middleware for public routes
     if (PUBLIC_ROUTES.includes(pathname) || pathname.startsWith('/blog/')) {
       return res;
     }
 
-    // If not signed in, redirect to sign in
-    if (!session) {
-      return NextResponse.redirect(new URL('/auth/sign-in', req.url));
+    // Skip middleware for public API routes
+    if (PUBLIC_API_ROUTES.some(route => pathname.startsWith(route))) {
+      return res;
     }
 
-    // Special handling for dashboard access
-    if (pathname.startsWith('/dashboard')) {
-      const hasValidSubscription = await checkSubscription(req);
-      
-      if (!hasValidSubscription) {
-        // Redirect to pricing page if no valid subscription
-        return NextResponse.redirect(new URL('/pricing', req.url));
-      }
+    // Get user session
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If not signed in and not on an auth route, redirect to sign in
+    if (!session && !pathname.startsWith('/auth/')) {
+      const redirectUrl = new URL('/auth/sign-in', req.url);
+      redirectUrl.searchParams.set('redirectTo', pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // Skip subscription check for auth routes and public routes
+    if (!session || pathname.startsWith('/auth/') || PUBLIC_ROUTES.includes(pathname)) {
+      return res;
+    }
+
+    // Check subscription for protected routes
+    const hasValidSubscription = await checkSubscription(session.user.id);
+    console.log('Subscription check for', pathname, ':', hasValidSubscription);
+    
+    if (!hasValidSubscription && pathname !== '/pricing') {
+      return NextResponse.redirect(new URL('/pricing', req.url));
     }
 
     return res;
   } catch (error) {
     console.error('Middleware error:', error);
-    return NextResponse.redirect(new URL('/auth/sign-in', req.url));
+    // On error, allow the request to continue
+    return NextResponse.next();
   }
 }

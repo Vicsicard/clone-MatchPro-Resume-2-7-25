@@ -1,12 +1,19 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
 export function createServerSupabaseClient() {
   const cookieStore = cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         get(name: string) {
@@ -16,14 +23,14 @@ export function createServerSupabaseClient() {
           try {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
-            // Handle the error or just swallow it if you want to ignore it
+            console.error('Error setting cookie:', error);
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: '', ...options });
+            cookieStore.delete({ name, ...options });
           } catch (error) {
-            // Handle the error or just swallow it if you want to ignore it
+            console.error('Error removing cookie:', error);
           }
         },
       },

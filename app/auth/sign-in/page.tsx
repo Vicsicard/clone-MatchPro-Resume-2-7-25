@@ -19,7 +19,7 @@ export default function SignIn() {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -28,11 +28,21 @@ export default function SignIn() {
         throw signInError;
       }
 
-      // Simply redirect to pricing after successful sign-in
+      if (!data.session) {
+        throw new Error('No session returned after sign in');
+      }
+
+      // Force a refresh to update auth state
+      router.refresh();
+      
+      // Wait a bit for the session to be properly set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Redirect to pricing
       router.push('/pricing');
     } catch (error: any) {
       console.error('Sign-in error:', error);
-      setError(error.message);
+      setError(error.message || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
