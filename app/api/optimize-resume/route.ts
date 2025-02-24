@@ -100,7 +100,9 @@ Optimized Resume:`;
     const optimizeResponse = await cohere.chat({
       message: prompt,
       model: 'command',
-      temperature: 0.2
+      temperature: 0.2,
+      stream: false,
+      preamble_override: null
     });
 
     if (!optimizeResponse.text) {

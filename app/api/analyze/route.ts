@@ -239,7 +239,9 @@ Remember:
 
 Suggestions:`,
             model: 'command',
-            temperature: 0.2
+            temperature: 0.2,
+            stream: false,
+            preamble_override: null
           });
         } catch (error) {
           console.error('Cohere API error:', error);
