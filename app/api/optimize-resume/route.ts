@@ -1,13 +1,15 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
-import cohere from 'cohere-ai';
+import { CohereClient } from 'cohere-ai';
 import { createPDFFromText } from './pdf-utils';
 
+// Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const cohereApiKey = process.env.COHERE_API_KEY;
 
+// Check required environment variables
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing Supabase environment variables');
   throw new Error('Application configuration error: Missing Supabase credentials');
@@ -18,8 +20,8 @@ if (!cohereApiKey) {
   throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
 }
 
-cohere.init(cohereApiKey);
-
+// Initialize clients
+const cohere = new CohereClient({ token: cohereApiKey });
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: NextRequest) {
@@ -161,3 +163,5 @@ Optimized Resume:`;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const runtime = 'nodejs';
