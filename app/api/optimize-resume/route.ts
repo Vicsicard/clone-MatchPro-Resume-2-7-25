@@ -213,11 +213,14 @@ Optimized Resume:`;
 
     // Generate optimized content
     const optimizeResponse = await cohere.generate({
-      model: 'command',
+      model: 'xlarge',
       prompt,
-      maxTokens: 2000,
-      temperature: 0.2,
-      k: 0,
+      maxTokens: 2048,
+      temperature: 0.5,
+      k: 40,
+      p: 0.75,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
       stopSequences: ["\n\n\n"],
       returnLikelihoods: 'NONE'
     });

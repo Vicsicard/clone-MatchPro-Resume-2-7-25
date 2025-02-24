@@ -22,15 +22,9 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-let cohere: CohereClient;
-try {
-  cohere = new CohereClient({
-    token: cohereApiKey
-  });
-} catch (error) {
-  console.error('Failed to initialize Cohere client:', error);
-  throw new Error('Failed to initialize AI analysis service');
-}
+const cohere = new CohereClient({
+  token: cohereApiKey
+});
 
 export const runtime = 'nodejs';
 
@@ -249,10 +243,10 @@ Remember:
 4. Category must be exactly one of: "Skills", "Experience", "Education", "Format", "Content"
 5. Make suggestions specific and actionable
 6. Focus on the most impactful improvements first`,
-            maxTokens: 1000,
+            maxTokens: 2000,
             temperature: 0.2,
             k: 0,
-            stopSequences: ["]"],
+            stopSequences: ["\n\n\n"],
             returnLikelihoods: 'NONE'
           });
         } catch (cohereError) {
