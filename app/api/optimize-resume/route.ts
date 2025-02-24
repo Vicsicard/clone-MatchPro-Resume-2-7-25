@@ -97,7 +97,7 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohere.generateText({
+    const optimizeResponse = await cohere.generate({
       prompt,
       model: 'command',
       maxTokens: 2000,
