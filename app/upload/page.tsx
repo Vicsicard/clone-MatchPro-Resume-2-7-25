@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ResumeUpload from '@/app/components/ResumeUpload';
+import { toast } from 'react-hot-toast';
 
 export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
@@ -19,21 +20,27 @@ export default function UploadPage() {
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('resume', file);
+      formData.append('jobDesc', file); // For testing, using same file
+      formData.append('userId', 'test-user'); // TODO: Get actual user ID
 
-      const response = await fetch('http://localhost:3002/api/analyze', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
       }
 
       const result = await response.json();
       setAnalysisResult(result);
+      toast.success('Resume analyzed successfully!');
     } catch (err: any) {
-      setError(err.message || 'An error occurred during upload');
+      const errorMessage = err.message || 'An error occurred during upload';
+      setError(errorMessage);
+      toast.error(errorMessage);
       console.error('Analysis error:', err);
     } finally {
       setIsUploading(false);
@@ -67,9 +74,22 @@ export default function UploadPage() {
       {analysisResult && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold mb-4">Analysis Results</h2>
-          <pre className="bg-gray-50 p-4 rounded-lg overflow-auto">
-            {JSON.stringify(analysisResult, null, 2)}
-          </pre>
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-medium mb-2">Similarity Score</h3>
+              <p className="text-lg">{(analysisResult.similarityScore * 100).toFixed(1)}%</p>
+            </div>
+            
+            <div className="space-y-4">
+              <h3 className="font-medium">Suggestions</h3>
+              {analysisResult.suggestions.map((suggestion: any, index: number) => (
+                <div key={index} className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-blue-600">{suggestion.suggestion}</h4>
+                  <p className="mt-2 text-gray-700">{suggestion.details}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
