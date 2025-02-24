@@ -1,17 +1,26 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse, NextRequest } from 'next/server';
-import { CohereClient } from 'cohere-ai';
-import pdfParse from 'pdf-parse';
-import { PDFDocument, rgb, StandardFonts, PageSizes } from 'pdf-lib';
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
+import cohere from 'cohere-ai';
+import { createPDFFromText } from './pdf-utils';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const cohereApiKey = process.env.COHERE_API_KEY;
 
-const cohere = new CohereClient({
-  token: process.env.COHERE_API_KEY!
-});
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables');
+  throw new Error('Application configuration error: Missing Supabase credentials');
+}
+
+if (!cohereApiKey) {
+  console.error('Missing Cohere API key');
+  throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
+}
+
+cohere.init(cohereApiKey);
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function createPDFFromText(text: string): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
@@ -104,84 +113,47 @@ async function createPDFFromText(text: string): Promise<Buffer> {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
-    }
+    const data = await request.json();
+    const { analysisId, selectedSuggestions } = data;
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get request body
-    const { analysisId, selectedSuggestions } = await request.json();
-    if (!analysisId || !selectedSuggestions || !selectedSuggestions.length) {
+    if (!analysisId || !selectedSuggestions || !Array.isArray(selectedSuggestions)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Get analysis record
+    // Get the analysis record
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
-      .select('*')
+      .select('resume_text, file_path')
       .eq('id', analysisId)
       .single();
 
     if (analysisError || !analysis) {
-      return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
+      console.error('Error fetching analysis:', analysisError);
+      return NextResponse.json({ error: 'Analysis record not found' }, { status: 404 });
     }
 
-    // Get file path and verify it exists
-    if (!analysis.file_path) {
-      return NextResponse.json({ error: 'Resume file path not found' }, { status: 400 });
+    const { resume_text: resumeText, file_path: filePath } = analysis;
+
+    if (!resumeText || !filePath) {
+      return NextResponse.json({ error: 'Resume text or file path not found in analysis record' }, { status: 400 });
     }
 
-    // Extract file name from path
-    const fileName = analysis.file_path.split('/').pop();
-    if (!fileName) {
-      return NextResponse.json({ error: 'Invalid file path format' }, { status: 400 });
+    // Get suggestions from selected IDs
+    const { data: suggestions, error: suggestionsError } = await supabase
+      .from('suggestions')
+      .select('suggestion, details')
+      .eq('analysis_id', analysisId)
+      .in('id', selectedSuggestions);
+
+    if (suggestionsError || !suggestions) {
+      console.error('Error fetching suggestions:', suggestionsError);
+      return NextResponse.json({ error: 'Failed to fetch selected suggestions' }, { status: 500 });
     }
 
-    // Verify file type is PDF
-    const fileType = fileName.split('.').pop()?.toLowerCase();
-    if (fileType !== 'pdf') {
-      return NextResponse.json({ error: 'Only PDF files are supported' }, { status: 400 });
-    }
-
-    // Get original resume file
-    const { data: resumeFile, error: resumeError } = await supabase.storage
-      .from('resumes')
-      .download(analysis.file_path);
-
-    if (resumeError || !resumeFile) {
-      console.error('Resume file error:', resumeError);
-      return NextResponse.json({ error: 'Failed to retrieve resume file' }, { status: 404 });
-    }
-
-    // Extract text from PDF
-    let resumeText;
-    try {
-      const data = await pdfParse(Buffer.from(await resumeFile.arrayBuffer()));
-      resumeText = data.text;
-    } catch (error) {
-      console.error('Error parsing PDF:', error);
-      return NextResponse.json({ error: 'Failed to parse PDF file' }, { status: 500 });
-    }
-
-    // Verify suggestions exist
-    if (!analysis.suggestions || !Array.isArray(analysis.suggestions)) {
-      return NextResponse.json({ error: 'No suggestions found for this analysis' }, { status: 400 });
-    }
-
-    // Get suggestions to implement
-    const suggestionsToImplement = analysis.suggestions.filter(
-      (s: any) => selectedSuggestions.includes(s.suggestion)
-    );
-
-    if (suggestionsToImplement.length === 0) {
-      return NextResponse.json({ error: 'None of the selected suggestions were found' }, { status: 400 });
-    }
+    const suggestionsToImplement = suggestions.map(s => ({
+      suggestion: s.suggestion,
+      details: s.details
+    }));
 
     // Generate optimization prompt
     const prompt = `You are a professional resume optimizer. Your task is to improve the following resume based on specific suggestions.
@@ -212,7 +184,7 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohere.createGeneration({
+    const optimizeResponse = await cohere.generate({
       prompt,
       model: 'command',
       maxTokens: 2000,
@@ -238,7 +210,7 @@ Optimized Resume:`;
       throw new Error('Generated text is empty after cleaning');
     }
 
-    // Create new PDF with optimized content
+    // Create PDF from optimized text
     let optimizedFile: Buffer;
     try {
       optimizedFile = await createPDFFromText(cleanedOptimizedText);
@@ -247,46 +219,34 @@ Optimized Resume:`;
       throw new Error('Failed to create optimized PDF');
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const optimizedFileName = `optimized_${timestamp}_${fileName}`;
-
-    // Upload optimized file
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Save optimized resume to storage
+    const optimizedFileName = `optimized_${filePath}`;
+    const { error: uploadError } = await supabase.storage
       .from('optimized-resumes')
-      .upload(`${user.id}/${optimizedFileName}`, optimizedFile, {
+      .upload(optimizedFileName, optimizedFile, {
         contentType: 'application/pdf',
-        upsert: true
+        cacheControl: '3600'
       });
 
     if (uploadError) {
-      throw new Error(`Failed to upload optimized resume: ${uploadError.message}`);
+      console.error('Error uploading optimized resume:', uploadError);
+      throw new Error('Failed to save optimized resume');
     }
 
-    // Generate download URL
-    const { data: { signedUrl } } = await supabase.storage
+    // Get download URL
+    const { data: { publicUrl } } = supabase.storage
       .from('optimized-resumes')
-      .createSignedUrl(`${user.id}/${optimizedFileName}`, 60 * 60); // 1 hour expiry
-
-    // Update analysis record with optimization details
-    await supabase
-      .from('analyses')
-      .update({
-        optimized_at: new Date().toISOString(),
-        optimized_file_name: optimizedFileName,
-        implemented_suggestions: selectedSuggestions
-      })
-      .eq('id', analysisId);
+      .getPublicUrl(optimizedFileName);
 
     return NextResponse.json({
-      message: 'Resume optimized successfully',
-      downloadUrl: signedUrl
+      success: true,
+      downloadUrl: publicUrl,
+      message: 'Resume optimized successfully'
     });
 
   } catch (error) {
-    console.error('Error in optimize-resume:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to optimize resume' },
-      { status: 500 }
-    );
+    console.error('Optimization error:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error occurred';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
 import { Database } from '@/types/supabase';
 import { Buffer } from 'buffer';
-import { CohereClient } from 'cohere-ai';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -22,9 +22,7 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-const cohere = new CohereClient({
-  token: cohereApiKey
-});
+cohere.init(cohereApiKey);
 
 export const runtime = 'nodejs';
 
@@ -216,7 +214,7 @@ export async function POST(request: NextRequest) {
         console.log('Generating suggestions with Cohere...');
         let response;
         try {
-          response = await cohere.createGeneration({
+          response = await cohere.generate({
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
