@@ -22,7 +22,7 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-const cohereClient = new cohere(cohereApiKey);
+cohere.init(cohereApiKey);
 
 export const runtime = 'nodejs';
 export const preferredRegion = 'auto';
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohereClient.generate({
+          response = await cohere.generate({
             model: 'command',
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
@@ -315,7 +315,7 @@ Remember:
         console.log('Calculating similarity score with Cohere...');
         let similarityResponse;
         try {
-          similarityResponse = await cohereClient.embed({
+          similarityResponse = await cohere.embed({
             texts: [resumeText, jobDescText],
             model: 'embed-english-v3.0',
             inputType: 'search_document'
