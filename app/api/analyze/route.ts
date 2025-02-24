@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
         console.log('Generating suggestions with Cohere...');
         let response;
         try {
-          response = await cohere.completion({
+          response = await cohere.createGeneration({
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
@@ -249,9 +249,9 @@ Remember:
             truncate: 'END'
           });
         } catch (cohereError) {
-          console.error('Cohere completion API error:', cohereError);
+          console.error('Cohere generation API error:', cohereError);
           const errorMessage = cohereError instanceof Error ? cohereError.message : JSON.stringify(cohereError);
-          throw new Error(`Cohere completion API failed: ${errorMessage}`);
+          throw new Error(`Cohere generation API failed: ${errorMessage}`);
         }
 
         if (!response.generations || !response.generations[0]) {
