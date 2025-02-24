@@ -214,17 +214,8 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohere.generate({
-            model: 'command',
-            prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
-
-Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
-[
-  {
-    "suggestion": "Brief, clear suggestion title",
-    "details": "Detailed explanation of the suggestion with specific examples from the resume"
-  }
-]
+          response = await cohere.chat({
+            message: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Resume Text:
 ${resumeText}
@@ -232,141 +223,159 @@ ${resumeText}
 Job Description:
 ${jobDescText}
 
-Remember:
-1. Focus on actionable, specific improvements
-2. Consider both the resume content and the job requirements
-3. Maintain professional tone
-4. Return ONLY valid JSON array
-5. Include 3-5 suggestions maximum`,
-            max_tokens: 2048,
-            temperature: 0.2
+Please provide specific, actionable suggestions for improving this resume to better match the job description. Focus on:
+1. Skills alignment
+2. Experience relevance
+3. Missing keywords
+4. Format and presentation
+5. Overall fit
+
+Provide your response in a clear, structured format.`,
+            model: 'command',
           });
-        } catch (error) {
-          console.error('Cohere API error:', error);
-          throw new Error('Failed to generate suggestions');
-        }
 
-        if (!response.body.generations?.[0]?.text) {
-          throw new Error('No suggestions generated');
-        }
+          // Extract suggestions from the response
+          const suggestions = response.text;
+          console.log('Raw suggestions:', suggestions);
 
-        const generatedText = response.body.generations[0].text;
-        console.log('Raw suggestions:', generatedText);
-
-        // Parse suggestions
-        let parsedSuggestions = [
-          {
-            suggestion: "Highlight relevant skills",
-            details: "Add specific skills mentioned in the job description to your resume. Focus on technical skills and industry-specific knowledge that directly match the requirements.",
-            impact: "High",
-            category: "Skills"
-          },
-          {
-            suggestion: "Quantify achievements",
-            details: "Add specific numbers and metrics to your work experience. For example, include project outcomes, team sizes, or percentage improvements you achieved.",
-            impact: "Medium",
-            category: "Experience"
-          },
-          {
-            suggestion: "Improve formatting",
-            details: "Enhance the resume layout to make it more readable and professional. Use consistent spacing, bullet points, and sections to organize information clearly.",
-            impact: "Medium",
-            category: "Format"
-          }
-        ];
-
-        try {
-          console.log('Parsing suggestions...');
-          // Clean up the response to ensure valid JSON
-          const suggestionText = generatedText
-            .trim()
-            .replace(/^[^[]*\[/, '[') // Remove any text before the first [
-            .replace(/][^]]*$/, ']') // Remove any text after the last ]
-            .replace(/\n/g, ' ') // Remove newlines
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .trim();
-          
-          if (suggestionText.startsWith('[') && suggestionText.endsWith(']')) {
-            try {
-              const tempSuggestions = JSON.parse(suggestionText);
-              if (Array.isArray(tempSuggestions) && tempSuggestions.length > 0) {
-                // Validate each suggestion
-                const validSuggestions = tempSuggestions.filter(suggestion => 
-                  suggestion.suggestion && 
-                  suggestion.details
-                );
-                
-                if (validSuggestions.length >= 3) {
-                  parsedSuggestions = validSuggestions.slice(0, 3);
-                }
-              }
-            } catch (error) {
-              console.error('Error parsing suggestions JSON:', error);
+          // Parse suggestions
+          let parsedSuggestions = [
+            {
+              suggestion: "Highlight relevant skills",
+              details: "Add specific skills mentioned in the job description to your resume. Focus on technical skills and industry-specific knowledge that directly match the requirements.",
+              impact: "High",
+              category: "Skills"
+            },
+            {
+              suggestion: "Quantify achievements",
+              details: "Add specific numbers and metrics to your work experience. For example, include project outcomes, team sizes, or percentage improvements you achieved.",
+              impact: "Medium",
+              category: "Experience"
+            },
+            {
+              suggestion: "Improve formatting",
+              details: "Enhance the resume layout to make it more readable and professional. Use consistent spacing, bullet points, and sections to organize information clearly.",
+              impact: "Medium",
+              category: "Format"
             }
+          ];
+
+          try {
+            console.log('Parsing suggestions...');
+            // Clean up the response to ensure valid JSON
+            const suggestionText = suggestions
+              .trim()
+              .replace(/^[^[]*\[/, '[') // Remove any text before the first [
+              .replace(/][^]]*$/, ']') // Remove any text after the last ]
+              .replace(/\n/g, ' ') // Remove newlines
+              .replace(/\s+/g, ' ') // Normalize whitespace
+              .trim();
+            
+            if (suggestionText.startsWith('[') && suggestionText.endsWith(']')) {
+              try {
+                const tempSuggestions = JSON.parse(suggestionText);
+                if (Array.isArray(tempSuggestions) && tempSuggestions.length > 0) {
+                  // Validate each suggestion
+                  const validSuggestions = tempSuggestions.filter(suggestion => 
+                    suggestion.suggestion && 
+                    suggestion.details
+                  );
+                  
+                  if (validSuggestions.length >= 3) {
+                    parsedSuggestions = validSuggestions.slice(0, 3);
+                  }
+                }
+              } catch (error) {
+                console.error('Error parsing suggestions JSON:', error);
+              }
+            }
+          } catch (parseError) {
+            console.error('Failed to parse suggestions:', parseError);
+            console.log('Raw suggestions text:', suggestions);
           }
-        } catch (parseError) {
-          console.error('Failed to parse suggestions:', parseError);
-          console.log('Raw suggestions text:', generatedText);
-        }
-        
-        console.log('Final suggestions:', parsedSuggestions);
+          
+          console.log('Final suggestions:', parsedSuggestions);
 
-        // Calculate similarity score
-        console.log('Calculating similarity score with Cohere...');
-        let similarityResponse;
-        try {
-          similarityResponse = await cohere.embed({
-            texts: [resumeText, jobDescText],
-            model: 'embed-english-v3.0',
-            inputType: 'search_document'
-          });
-        } catch (embedError) {
-          console.error('Cohere embed API error:', embedError);
-          const errorMessage = embedError instanceof Error ? embedError.message : JSON.stringify(embedError);
-          throw new Error(`Cohere embed API failed: ${errorMessage}`);
-        }
+          // Calculate similarity score
+          console.log('Calculating similarity score with Cohere...');
+          let similarityResponse;
+          try {
+            similarityResponse = await cohere.embed({
+              texts: [resumeText, jobDescText],
+              model: 'embed-english-v3.0',
+              inputType: 'search_document'
+            });
+          } catch (embedError) {
+            console.error('Cohere embed API error:', embedError);
+            const errorMessage = embedError instanceof Error ? embedError.message : JSON.stringify(embedError);
+            throw new Error(`Cohere embed API failed: ${errorMessage}`);
+          }
 
-        if (!similarityResponse.embeddings || similarityResponse.embeddings.length !== 2) {
-          throw new Error('Invalid embedding response from Cohere');
-        }
+          if (!similarityResponse.embeddings || similarityResponse.embeddings.length !== 2) {
+            throw new Error('Invalid embedding response from Cohere');
+          }
 
-        const embeddings = similarityResponse.embeddings;
-        const similarityScore = calculateCosineSimilarity(embeddings[0], embeddings[1]);
-        console.log('Similarity score:', similarityScore);
+          const embeddings = similarityResponse.embeddings;
+          const similarityScore = calculateCosineSimilarity(embeddings[0], embeddings[1]);
+          console.log('Similarity score:', similarityScore);
 
-        // Update analysis record with results
-        console.log('Updating analysis record with results...');
-        const { error: finalUpdateError } = await supabase
-          .from('analyses')
-          .update({
+          // Update analysis record with results
+          console.log('Updating analysis record with results...');
+          const { error: finalUpdateError } = await supabase
+            .from('analyses')
+            .update({
+              status: 'completed',
+              similarity_score: similarityScore,
+              suggestions: parsedSuggestions,
+              content_json: {
+                suggestions: parsedSuggestions,
+                similarity_score: similarityScore
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', analysisId);
+
+          if (finalUpdateError) {
+            console.error('Final update error:', finalUpdateError);
+            throw finalUpdateError;
+          }
+
+          console.log('Analysis completed successfully');
+          return NextResponse.json({
+            id: analysisId,
             status: 'completed',
             similarity_score: similarityScore,
-            suggestions: parsedSuggestions,
-            content_json: {
-              suggestions: parsedSuggestions,
-              similarity_score: similarityScore
-            },
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', analysisId);
+            suggestions: parsedSuggestions
+          });
+        } catch (error) {
+          console.error('Analysis error:', error);
+          const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
 
-        if (finalUpdateError) {
-          console.error('Final update error:', finalUpdateError);
-          throw finalUpdateError;
+          console.log('Updating analysis record with error...');
+          await supabase
+            .from('analyses')
+            .update({ 
+              status: 'failed',
+              error: errorMessage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', analysisId);
+
+          return NextResponse.json({ 
+            error: 'Failed to analyze resume', 
+            details: {
+              message: errorMessage,
+              stack: errorStack,
+              phase: 'cohere_analysis'
+            }
+          }, { status: 500 });
         }
-
-        console.log('Analysis completed successfully');
-        return NextResponse.json({
-          id: analysisId,
-          status: 'completed',
-          similarity_score: similarityScore,
-          suggestions: parsedSuggestions
-        });
       } catch (error) {
-        console.error('Analysis error:', error);
-        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        console.error('File processing error:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
-
+        
         console.log('Updating analysis record with error...');
         await supabase
           .from('analyses')
@@ -378,36 +387,28 @@ Remember:
           .eq('id', analysisId);
 
         return NextResponse.json({ 
-          error: 'Failed to analyze resume', 
+          error: 'Failed to process files', 
           details: {
             message: errorMessage,
             stack: errorStack,
-            phase: 'cohere_analysis'
+            phase: 'file_processing'
           }
         }, { status: 500 });
       }
     } catch (error) {
-      console.error('File processing error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      
-      console.log('Updating analysis record with error...');
-      await supabase
-        .from('analyses')
-        .update({ 
-          status: 'failed',
-          error: errorMessage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', analysisId);
-
+      console.error('Unexpected error:', error);
+      if (error instanceof Error) {
+        return NextResponse.json({ 
+          error: 'Unexpected error', 
+          details: {
+            message: error.message,
+            stack: error.stack
+          }
+        }, { status: 500 });
+      }
       return NextResponse.json({ 
-        error: 'Failed to process files', 
-        details: {
-          message: errorMessage,
-          stack: errorStack,
-          phase: 'file_processing'
-        }
+        error: 'Unexpected error',
+        details: String(error)
       }, { status: 500 });
     }
   } catch (error) {
