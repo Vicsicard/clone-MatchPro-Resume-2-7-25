@@ -1,17 +1,29 @@
+import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { Database } from '@/types/supabase';
+import { CohereClient } from 'cohere-ai';
+
+// Initialize environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const cohereApiKey = process.env.COHERE_API_KEY;
+
+// Check required environment variables
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables');
+  throw new Error('Application configuration error: Missing Supabase credentials');
+}
+
+if (!cohereApiKey) {
+  console.error('Missing Cohere API key');
+  throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
+}
+
+// Initialize clients
+const cohereClient = new CohereClient({ token: cohereApiKey });
+const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
 export const runtime = 'edge';
-
-// Initialize Supabase client with service role key
-const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      })
-    : null;
 
 interface DocumentEmbedding {
   embedding: number[];
@@ -30,42 +42,18 @@ interface CohereEmbedResponse {
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {
-  if (!process.env.COHERE_API_KEY) {
-    throw new Error('COHERE_API_KEY is not configured');
-  }
-
   console.log('Calling Cohere API...');
-  const response = await fetch('https://api.cohere.ai/v1/embed', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.COHERE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      texts: [text],
-      model: 'embed-english-v3.0',
-      input_type: 'search_document'
-    })
+  const response = await cohereClient.embed({
+    texts: [text],
+    model: 'embed-english-v3.0',
+    inputType: 'search_document',
   });
 
-  console.log('Cohere API response status:', response.status);
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('Cohere API error:', error);
-    throw new Error(`Cohere API error: ${error.message}`);
-  }
-
-  const data = await response.json();
-  console.log('Cohere API response:', {
-    hasEmbeddings: !!data.embeddings,
-    embeddingsLength: data.embeddings?.[0]?.length
-  });
-
-  if (!data.embeddings?.[0]) {
+  if (!response.embeddings || !response.embeddings[0]) {
     throw new Error('Failed to generate embedding');
   }
 
-  return data.embeddings[0];
+  return response.embeddings[0];
 }
 
 export async function POST(req: Request) {

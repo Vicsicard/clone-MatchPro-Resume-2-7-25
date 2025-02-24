@@ -99,24 +99,22 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohereClient.generate({
-      prompt,
+    const optimizeResponse = await cohereClient.chat({
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
       model: 'command',
-      maxTokens: 2000,
-      temperature: 0.2,
-      k: 0,
-      p: 0.75,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      stop_sequences: [],
-      return_likelihoods: 'NONE'
+      temperature: 0.2
     });
 
-    if (!optimizeResponse.body.generations || !optimizeResponse.body.generations[0]) {
+    if (!optimizeResponse.message?.content?.[0]?.text) {
       throw new Error('Failed to generate optimized resume');
     }
 
-    const optimizedText = optimizeResponse.body.generations[0].text;
+    const optimizedText = optimizeResponse.message.content[0].text;
 
     // Clean and validate the optimized text
     const cleanedOptimizedText = optimizedText
