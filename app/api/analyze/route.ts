@@ -213,8 +213,8 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohere.chat({
-            message: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
+          response = await cohere.generate({
+            prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
 [
@@ -239,20 +239,21 @@ Remember:
 
 Suggestions:`,
             model: 'command',
+            maxTokens: 1000,
             temperature: 0.2,
-            stream: false,
-            preamble_override: null
+            returnLikelihoods: 'NONE',
+            truncate: 'END'
           });
         } catch (error) {
           console.error('Cohere API error:', error);
           throw new Error('Failed to generate suggestions');
         }
 
-        if (!response.text) {
+        if (!response.generations || !response.generations[0]) {
           throw new Error('No suggestions generated');
         }
 
-        const generatedText = response.text;
+        const generatedText = response.generations[0].text;
         console.log('Raw suggestions:', generatedText);
 
         // Parse suggestions

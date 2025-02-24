@@ -97,19 +97,20 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohere.chat({
-      message: prompt,
+    const optimizeResponse = await cohere.generate({
+      prompt,
       model: 'command',
+      maxTokens: 2000,
       temperature: 0.2,
-      stream: false,
-      preamble_override: null
+      returnLikelihoods: 'NONE',
+      truncate: 'END'
     });
 
-    if (!optimizeResponse.text) {
+    if (!optimizeResponse.generations || !optimizeResponse.generations[0]) {
       throw new Error('Failed to generate optimized resume');
     }
 
-    const optimizedText = optimizeResponse.text;
+    const optimizedText = optimizeResponse.generations[0].text;
 
     // Clean and validate the optimized text
     const cleanedOptimizedText = optimizedText
