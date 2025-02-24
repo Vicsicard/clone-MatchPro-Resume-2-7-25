@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohere.generate({
+          response = await cohere.generateText({
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
