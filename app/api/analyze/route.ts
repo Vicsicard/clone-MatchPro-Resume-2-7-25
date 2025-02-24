@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
 import { Database } from '@/types/supabase';
 import { Buffer } from 'buffer';
-import { CohereClient } from 'cohere-ai';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -22,9 +22,10 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-const cohereClient = new CohereClient({ token: cohereApiKey });
+const cohereClient = new cohere(cohereApiKey);
 
 export const runtime = 'nodejs';
+export const preferredRegion = 'auto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -213,12 +214,9 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohereClient.chat({
+          response = await cohereClient.generate({
             model: 'command',
-            messages: [
-              {
-                role: 'user',
-                content: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
+            prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
 [
@@ -239,9 +237,8 @@ Remember:
 2. Consider both the resume content and the job requirements
 3. Maintain professional tone
 4. Return ONLY valid JSON array
-5. Include 3-5 suggestions maximum`
-              }
-            ],
+5. Include 3-5 suggestions maximum`,
+            max_tokens: 2048,
             temperature: 0.2
           });
         } catch (error) {
@@ -249,11 +246,11 @@ Remember:
           throw new Error('Failed to generate suggestions');
         }
 
-        if (!response.message?.content?.[0]?.text) {
+        if (!response.body.generations?.[0]?.text) {
           throw new Error('No suggestions generated');
         }
 
-        const generatedText = response.message.content[0].text;
+        const generatedText = response.body.generations[0].text;
         console.log('Raw suggestions:', generatedText);
 
         // Parse suggestions

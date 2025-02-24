@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 import { createPDFFromText } from './pdf-utils';
-import { CohereClient } from 'cohere-ai';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,11 +20,11 @@ if (!cohereApiKey) {
   throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
 }
 
+// Initialize Cohere
+const cohereClient = new cohere(cohereApiKey);
+
 // Initialize Supabase client
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
-// Initialize Cohere client
-const cohereClient = new CohereClient({ token: cohereApiKey });
 
 export async function POST(request: NextRequest) {
   try {
@@ -99,22 +99,18 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohereClient.chat({
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+    const optimizeResponse = await cohereClient.generate({
+      prompt,
       model: 'command',
+      max_tokens: 2048,
       temperature: 0.2
     });
 
-    if (!optimizeResponse.message?.content?.[0]?.text) {
+    if (!optimizeResponse.body.generations?.[0]?.text) {
       throw new Error('Failed to generate optimized resume');
     }
 
-    const optimizedText = optimizeResponse.message.content[0].text;
+    const optimizedText = optimizeResponse.body.generations[0].text;
 
     // Clean and validate the optimized text
     const cleanedOptimizedText = optimizedText
@@ -169,3 +165,4 @@ Optimized Resume:`;
 }
 
 export const runtime = 'nodejs';
+export const preferredRegion = 'auto';

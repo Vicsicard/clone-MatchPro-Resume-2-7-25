@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
-import { CohereClient } from 'cohere-ai';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,10 +20,11 @@ if (!cohereApiKey) {
 }
 
 // Initialize clients
-const cohereClient = new CohereClient({ token: cohereApiKey });
+const cohereClient = new cohere(cohereApiKey);
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const preferredRegion = 'auto';
 
 interface DocumentEmbedding {
   embedding: number[];
