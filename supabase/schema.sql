@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS analyses (
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz,
     error text,
-    results jsonb
+    results jsonb,
+    similarity_score float,
+    suggestions jsonb,
+    content_json jsonb
 );
 
 -- Create document_embeddings table

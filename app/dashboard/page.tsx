@@ -18,11 +18,17 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
-  const [optimizationLoading, setOptimizationLoading] = useState(false);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizationProgress, setOptimizationProgress] = useState<string>('');
+  const [optimizedResumeUrl, setOptimizedResumeUrl] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const router = useRouter();
   const supabase = createClient();
@@ -35,7 +41,7 @@ export default function Dashboard() {
     setError(null);
     setAnalysisId(null);
     setAnalysisStatus(null);
-    setAnalysisResult(null);
+    setAnalysisResults(null);
     setStatusMessage('');
   };
 
@@ -63,7 +69,8 @@ export default function Dashboard() {
       }
 
       // Start analysis
-      const response = await fetch('http://localhost:3000/api/analyze', {
+      const apiUrl = new URL('/api/analyze', window.location.origin);
+      const response = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
         headers: {
@@ -71,33 +78,33 @@ export default function Dashboard() {
         }
       });
 
-      const contentType = response.headers.get('content-type');
+      const data = await response.json();
+
       if (!response.ok) {
+        console.error('Server error response:', data);
         let errorMessage = 'Failed to analyze resume';
-        try {
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } else {
-            const text = await response.text();
-            console.error('Non-JSON error response:', text);
+        
+        if (data.details) {
+          if (data.details.message) {
+            errorMessage += `: ${data.details.message}`;
           }
-        } catch (e) {
-          console.error('Error parsing error response:', e);
+          if (data.details.phase) {
+            errorMessage += ` (phase: ${data.details.phase})`;
+          }
         }
+        
+        console.error('Full error details:', data.details);
         throw new Error(errorMessage);
       }
 
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response format from server');
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      const data = await response.json();
-      
       // Update state with analysis results
       setAnalysisId(data.analysisId);
       setAnalysisStatus('completed');
-      setAnalysisResult(data);
+      setAnalysisResults(data);
       
       if (data.similarity_score) {
         const score = Math.round(data.similarity_score * 100);
@@ -114,71 +121,71 @@ export default function Dashboard() {
       
     } catch (error: any) {
       console.error('Analysis error:', error);
-      setError(error.message);
-      setStatusMessage(`Error: ${error.message}`);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      setStatusMessage(`Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const toggleSuggestion = (suggestion: string) => {
+  const handleSuggestionSelect = (suggestion: string) => {
     setSelectedSuggestions(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(suggestion)) {
-        newSet.delete(suggestion);
+      if (prev.includes(suggestion)) {
+        return prev.filter(s => s !== suggestion);
       } else {
-        newSet.add(suggestion);
+        return [...prev, suggestion];
       }
-      return newSet;
     });
+    // Reset optimization states when selection changes
+    setOptimizedResumeUrl(null);
+    setOptimizationProgress('');
   };
 
-  const handleOptimizeResume = async () => {
-    if (!session?.access_token || !analysisId || selectedSuggestions.size === 0) {
+  const handleOptimize = async () => {
+    if (!selectedSuggestions.length || !analysisResults?.id) {
+      setNotification({
+        type: 'error',
+        message: 'Please select at least one suggestion to implement'
+      });
       return;
     }
-
-    setOptimizationLoading(true);
-    setError(null);
-    setStatusMessage('Optimizing resume...');
-
+    
+    setIsOptimizing(true);
+    setOptimizationProgress('Starting optimization...');
     try {
-      const response = await fetch('/api/optimize', {
+      const response = await fetch('/api/optimize-resume', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          Authorization: `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          analysisId,
-          selectedSuggestions: Array.from(selectedSuggestions)
+          analysisId: analysisResults.id,
+          selectedSuggestions: selectedSuggestions
         })
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to optimize resume');
+        throw new Error(data.error || 'Failed to optimize resume');
       }
 
-      // Get the optimized file as a blob
-      const blob = await response.blob();
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `optimized-${files.resume?.name || 'resume'}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      setStatusMessage('Resume optimized and downloaded successfully!');
-    } catch (error: any) {
-      console.error('Optimization error:', error);
-      setError(error.message || 'Failed to optimize resume');
-      setStatusMessage('Error: Failed to optimize resume');
+      setOptimizedResumeUrl(data.downloadUrl);
+      setOptimizationProgress('Resume optimized successfully!');
+      setNotification({
+        type: 'success',
+        message: 'Resume optimized successfully! Click the download button to get your optimized resume.'
+      });
+    } catch (error) {
+      console.error('Error optimizing resume:', error);
+      setOptimizationProgress('');
+      setNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to optimize resume'
+      });
     } finally {
-      setOptimizationLoading(false);
+      setIsOptimizing(false);
     }
   };
 
@@ -230,10 +237,10 @@ export default function Dashboard() {
   }, [router, supabase]);
 
   useEffect(() => {
-    if (analysisResult) {
-      console.log('Analysis Result:', analysisResult);
+    if (analysisResults) {
+      console.log('Analysis Results:', analysisResults);
     }
-  }, [analysisResult]);
+  }, [analysisResults]);
 
   // Poll for analysis status
   useEffect(() => {
@@ -261,7 +268,7 @@ export default function Dashboard() {
           if (analysis.status === 'completed') {
             clearInterval(pollInterval);
             if (analysis.content_json?.analysis) {
-              setAnalysisResult(analysis.content_json.analysis);
+              setAnalysisResults(analysis.content_json.analysis);
               if (analysis.content_json.analysis.similarity_score) {
                 const score = Math.round(analysis.content_json.analysis.similarity_score * 100);
                 setStatusMessage(`Analysis complete! Match score: ${score}%`);
@@ -279,77 +286,14 @@ export default function Dashboard() {
         }
       } catch (error: any) {
         console.error('Error polling analysis status:', error);
-        setError('Failed to check analysis status');
-        setStatusMessage('Error: Failed to check analysis status');
+        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+        setStatusMessage(`Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`);
         clearInterval(pollInterval);
       }
     }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(pollInterval);
   }, [analysisId, analysisStatus, supabase]);
-
-  const pollAnalysisStatus = async (analysisId: string) => {
-    try {
-      const { data: analysis, error } = await supabase
-        .from('analyses')
-        .select('*')
-        .eq('id', analysisId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching analysis:', error);
-        setError('Failed to fetch analysis status');
-        setStatusMessage('Error: Failed to fetch analysis status');
-        return;
-      }
-
-      if (analysis) {
-        setAnalysisStatus(analysis.status);
-        
-        if (analysis.status === 'completed') {
-          if (analysis.content_json?.analysis) {
-            setAnalysisResult(analysis.content_json.analysis);
-            if (analysis.content_json.analysis.similarity_score) {
-              const score = Math.round(analysis.content_json.analysis.similarity_score * 100);
-              setStatusMessage(`Analysis complete! Match score: ${score}%`);
-            } else {
-              setStatusMessage('Analysis complete!');
-            }
-          }
-        } else if (analysis.status === 'processing') {
-          setStatusMessage('Processing your documents...');
-        } else if (analysis.status === 'failed') {
-          setStatusMessage(`Analysis failed: ${analysis.error || 'Unknown error'}`);
-          setError(analysis.error || 'Analysis failed');
-        }
-      }
-    } catch (error: any) {
-      console.error('Error polling analysis status:', error);
-      setError('Failed to check analysis status');
-      setStatusMessage('Error: Failed to check analysis status');
-    }
-  };
-
-  const refreshAnalyses = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('analyses')
-        .select('*');
-
-      if (error) {
-        console.error('Error fetching analyses:', error);
-        setError('Failed to fetch analyses');
-        setStatusMessage('Error: Failed to fetch analyses');
-        return;
-      }
-
-      console.log('Analyses:', data);
-    } catch (error: any) {
-      console.error('Error refreshing analyses:', error);
-      setError('Failed to refresh analyses');
-      setStatusMessage('Error: Failed to refresh analyses');
-    }
-  };
 
   if (!session) {
     return (
@@ -361,6 +305,32 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {notification && (
+        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white shadow-sm rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Resume Analysis Dashboard</h1>
@@ -438,172 +408,205 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Analysis Status and Results */}
-          {analysisId && (
+          {/* Analysis Results */}
+          {analysisResults && (
             <div className="mt-8 space-y-6">
-              {/* Status */}
+              {/* Match Score */}
               <div className="bg-white p-6 rounded-lg border border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Analysis Status</h2>
-                <div className="flex items-center space-x-2" data-testid="analysis-status">
-                  {analysisStatus === 'processing' && (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                      <p className="text-gray-600">Processing your documents...</p>
-                    </>
-                  )}
-                  {analysisStatus === 'completed' && (
-                    <>
-                      <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      <p className="text-gray-600">Analysis completed!</p>
-                    </>
-                  )}
-                  {analysisStatus === 'failed' && (
-                    <>
-                      <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      <p className="text-red-600">Analysis failed. Please try again.</p>
-                    </>
-                  )}
+                <h2 className="text-xl font-semibold mb-4">Match Score</h2>
+                <div className="text-3xl font-bold text-blue-600">
+                  {Math.round(analysisResults.similarity_score * 100)}%
                 </div>
               </div>
 
-              {/* Results */}
-              {analysisResult && (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold mb-4">Analysis Results</h2>
-                  <div className="bg-white shadow rounded-lg p-6">
-                    {/* Match Score */}
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-700 font-semibold">Match Score:</span>
-                        <div className="flex items-center">
-                          <div className="w-24 h-2 bg-gray-200 rounded-full mr-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                (analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100 >= 80
-                                  ? 'bg-green-500'
-                                  : (analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100 >= 60
-                                  ? 'bg-yellow-500'
-                                  : 'bg-red-500'
-                              }`}
-                              style={{
-                                width: `${(analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100}%`,
+              {/* Suggestions */}
+              <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4">Suggestions</h2>
+                <div className="space-y-4">
+                  {analysisResults.suggestions.map((suggestion: any, index: number) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border transition-all ${
+                        selectedSuggestions.includes(suggestion.suggestion)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedSuggestions.includes(suggestion.suggestion)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleSuggestionSelect(suggestion.suggestion);
                               }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-4 w-4 text-blue-600 rounded cursor-pointer"
                             />
+                            <h4 className="font-medium cursor-pointer" onClick={() => handleSuggestionSelect(suggestion.suggestion)}>
+                              {suggestion.suggestion}
+                            </h4>
                           </div>
-                          <span className="text-gray-900 font-bold">
-                            {Math.round((analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100)}%
+                          <p className="text-gray-600 mt-2 ml-6">{suggestion.details}</p>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <span className={`px-2 py-1 rounded text-sm ${
+                            suggestion.impact === 'High'
+                              ? 'bg-red-100 text-red-800'
+                              : suggestion.impact === 'Medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {suggestion.impact}
+                          </span>
+                          <span className="px-2 py-1 bg-gray-100 rounded text-sm">
+                            {suggestion.category}
                           </span>
                         </div>
                       </div>
-                      <p className="text-gray-600">
-                        {(analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100 >= 80
-                          ? 'Excellent match! Your resume is well-aligned with the job requirements.'
-                          : (analysisResult.similarity_score || analysisResult.analysis?.similarity_score || 0) * 100 >= 60
-                          ? 'Moderate match. Consider updating your resume to better align with the job requirements.'
-                          : 'Low match. We recommend significant updates to your resume to better match the job requirements.'}
-                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Suggestions and Optimization UI */}
+              {analysisResults?.suggestions && (
+                <div className="mt-8 space-y-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-semibold">Improvement Suggestions</h3>
+                      <button
+                        onClick={() => {
+                          if (analysisResults.suggestions) {
+                            if (selectedSuggestions.length === analysisResults.suggestions.length) {
+                              setSelectedSuggestions([]);
+                            } else {
+                              setSelectedSuggestions(analysisResults.suggestions.map(s => s.suggestion));
+                            }
+                          }
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {selectedSuggestions.length === analysisResults.suggestions.length
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </button>
                     </div>
 
-                    {/* Improvement Suggestions with Checkboxes */}
-                    {((analysisResult.results?.improvement_suggestions || 
-                       analysisResult.improvement_suggestions ||
-                       analysisResult.suggestions ||
-                       analysisResult.analysis?.suggestions) || []).length > 0 && (
-                      <div className="mt-6">
-                        <h3 className="text-lg font-semibold mb-3">Suggested Improvements</h3>
-                        <div className="space-y-3">
-                          {(analysisResult.results?.improvement_suggestions || 
-                            analysisResult.improvement_suggestions ||
-                            analysisResult.suggestions ||
-                            analysisResult.analysis?.suggestions || []).map((suggestion: string, index: number) => (
-                            <div key={index} className="flex items-start space-x-3 bg-blue-50 p-3 rounded-lg">
-                              <div className="flex-shrink-0 mt-1">
+                    <div className="space-y-4">
+                      {analysisResults.suggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border transition-all ${
+                            selectedSuggestions.includes(suggestion.suggestion)
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2">
                                 <input
                                   type="checkbox"
-                                  id={`suggestion-${index}`}
-                                  checked={selectedSuggestions.has(suggestion)}
-                                  onChange={() => toggleSuggestion(suggestion)}
-                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                                />
-                              </div>
-                              <label 
-                                htmlFor={`suggestion-${index}`}
-                                className="text-sm text-gray-700 cursor-pointer flex-grow"
-                              >
-                                {suggestion}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Optimize Resume Button */}
-                        <div className="mt-4">
-                          <button
-                            onClick={handleOptimizeResume}
-                            disabled={selectedSuggestions.size === 0 || optimizationLoading}
-                            className={`w-full px-4 py-2 rounded-md text-white font-medium ${
-                              selectedSuggestions.size === 0 || optimizationLoading
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
-                          >
-                            {optimizationLoading ? (
-                              <span className="flex items-center justify-center">
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Optimizing Resume...
-                              </span>
-                            ) : (
-                              'Optimize Resume with Selected Improvements'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Score Details */}
-                    {(analysisResult.score || analysisResult.analysis?.score) && (
-                      <div className="mt-6">
-                        <h3 className="text-lg font-semibold mb-3">Score Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {Object.entries(analysisResult.score || analysisResult.analysis?.score || {}).map(([category, score]) => (
-                            <div key={category} className="bg-gray-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="text-sm font-medium text-gray-700 capitalize">
-                                  {category.replace(/_/g, ' ')}
-                                </span>
-                                <span className="text-sm font-bold text-gray-900">
-                                  {typeof score === 'number' ? `${Math.round(score * 100)}%` : ''}
-                                </span>
-                              </div>
-                              <div className="w-full h-2 bg-gray-200 rounded-full">
-                                <div
-                                  className={`h-2 rounded-full ${
-                                    (typeof score === 'number' ? score : 0) * 100 >= 80
-                                      ? 'bg-green-500'
-                                      : (typeof score === 'number' ? score : 0) * 100 >= 60
-                                      ? 'bg-yellow-500'
-                                      : 'bg-red-500'
-                                  }`}
-                                  style={{
-                                    width: `${(typeof score === 'number' ? score : 0) * 100}%`,
+                                  checked={selectedSuggestions.includes(suggestion.suggestion)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleSuggestionSelect(suggestion.suggestion);
                                   }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-4 w-4 text-blue-600 rounded cursor-pointer"
                                 />
+                                <h4 className="font-medium cursor-pointer" onClick={() => handleSuggestionSelect(suggestion.suggestion)}>
+                                  {suggestion.suggestion}
+                                </h4>
                               </div>
+                              <p className="text-gray-600 mt-2 ml-6">{suggestion.details}</p>
                             </div>
-                          ))}
+                            <div className="flex items-center space-x-2 ml-4">
+                              <span className={`px-2 py-1 rounded text-sm ${
+                                suggestion.impact === 'High'
+                                  ? 'bg-red-100 text-red-800'
+                                  : suggestion.impact === 'Medium'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {suggestion.impact}
+                              </span>
+                              <span className="px-2 py-1 bg-gray-100 rounded text-sm">
+                                {suggestion.category}
+                              </span>
+                            </div>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-6 space-y-4">
+                      {optimizationProgress && (
+                        <div className="text-sm text-gray-600">
+                          {optimizationProgress}
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center">
+                        <button
+                          onClick={handleOptimize}
+                          disabled={!selectedSuggestions.length || isOptimizing}
+                          className={`px-4 py-2 rounded-lg font-medium ${
+                            !selectedSuggestions.length || isOptimizing
+                              ? 'bg-gray-300 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          }`}
+                        >
+                          {isOptimizing ? (
+                            <span className="flex items-center">
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Optimizing...
+                            </span>
+                          ) : (
+                            `Optimize Selected (${selectedSuggestions.length})`
+                          )}
+                        </button>
+                        
+                        {optimizedResumeUrl && (
+                          <a
+                            href={optimizedResumeUrl}
+                            download
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center"
+                          >
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Download Optimized Resume
+                          </a>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Download Section */}
+          {optimizedResumeUrl && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4">Download Optimized Resume</h2>
+              <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <p className="mb-4">Your optimized resume is ready!</p>
+                <a
+                  href={optimizedResumeUrl}
+                  download
+                  className="px-6 py-3 rounded-md text-white font-medium bg-green-600 hover:bg-green-700 inline-block"
+                >
+                  Download Optimized Resume
+                </a>
+              </div>
             </div>
           )}
         </div>
