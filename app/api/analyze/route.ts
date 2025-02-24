@@ -321,7 +321,7 @@ Remember:
           similarityResponse = await cohereClient.embed({
             texts: [resumeText, jobDescText],
             model: 'embed-english-v3.0',
-            inputType: 'search_document',
+            inputType: 'search_document'
           });
         } catch (embedError) {
           console.error('Cohere embed API error:', embedError);
