@@ -212,38 +212,34 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohere.generate({
-      model: 'xlarge',
-      prompt,
-      maxTokens: 2048,
-      temperature: 0.5,
-      k: 40,
-      p: 0.75,
-      frequencyPenalty: 0,
-      presencePenalty: 0,
-      stopSequences: ["\n\n\n"],
-      returnLikelihoods: 'NONE'
+    const optimizeResponse = await cohere.chat({
+      message: prompt,
+      model: 'command',
+      temperature: 0.2,
+      maxTokens: 2000
     });
 
-    if (!optimizeResponse.generations?.[0]?.text) {
+    if (!optimizeResponse.messages || !optimizeResponse.messages[0]) {
       throw new Error('Failed to generate optimized resume');
     }
 
+    const optimizedText = optimizeResponse.messages[0].text;
+
     // Clean and validate the optimized text
-    const optimizedText = optimizeResponse.generations[0].text
+    const cleanedOptimizedText = optimizedText
       .trim()
       .replace(/[^\x20-\x7E\n]/g, '') // Remove non-ASCII characters
       .replace(/\r\n/g, '\n')          // Normalize line endings
       .replace(/[\n]{3,}/g, '\n\n');   // Remove excessive line breaks
 
-    if (!optimizedText) {
+    if (!cleanedOptimizedText) {
       throw new Error('Generated text is empty after cleaning');
     }
 
     // Create new PDF with optimized content
     let optimizedFile: Buffer;
     try {
-      optimizedFile = await createPDFFromText(optimizedText);
+      optimizedFile = await createPDFFromText(cleanedOptimizedText);
     } catch (error) {
       console.error('PDF creation error:', error);
       throw new Error('Failed to create optimized PDF');
