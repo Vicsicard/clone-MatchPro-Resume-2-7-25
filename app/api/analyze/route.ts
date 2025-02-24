@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
 import { Database } from '@/types/supabase';
 import { Buffer } from 'buffer';
-import { CohereClient } from 'cohere-ai';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -22,7 +22,7 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-const cohere = new CohereClient({ token: cohereApiKey });
+const cohereClient = cohere.ClientV2(cohereApiKey);
 
 export const runtime = 'nodejs';
 
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
         // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohere.generate({
+          response = await cohereClient.generate({
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
@@ -322,7 +322,7 @@ Suggestions:`,
         console.log('Calculating similarity score with Cohere...');
         let similarityResponse;
         try {
-          similarityResponse = await cohere.embed({
+          similarityResponse = await cohereClient.embed({
             texts: [resumeText, jobDescText],
             model: 'embed-english-v3.0',
             inputType: 'search_document',

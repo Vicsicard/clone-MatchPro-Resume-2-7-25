@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
-import { CohereClient } from 'cohere-ai';
-import { createPDFFromText } from './pdf-utils';
+import { generatePdf } from './pdf-utils';
+import cohere from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,9 +20,11 @@ if (!cohereApiKey) {
   throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
 }
 
-// Initialize clients
-const cohere = new CohereClient({ token: cohereApiKey });
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize Supabase client
+const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+
+// Initialize Cohere client
+const cohereClient = cohere.ClientV2(cohereApiKey);
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,7 +99,7 @@ Instructions:
 Optimized Resume:`;
 
     // Generate optimized content
-    const optimizeResponse = await cohere.generate({
+    const optimizeResponse = await cohereClient.generate({
       prompt,
       model: 'command',
       maxTokens: 2000,
@@ -110,11 +112,11 @@ Optimized Resume:`;
       return_likelihoods: 'NONE'
     });
 
-    if (!optimizeResponse.generations || !optimizeResponse.generations[0]) {
+    if (!optimizeResponse.body.generations || !optimizeResponse.body.generations[0]) {
       throw new Error('Failed to generate optimized resume');
     }
 
-    const optimizedText = optimizeResponse.generations[0].text;
+    const optimizedText = optimizeResponse.body.generations[0].text;
 
     // Clean and validate the optimized text
     const cleanedOptimizedText = optimizedText
@@ -130,7 +132,7 @@ Optimized Resume:`;
     // Create PDF from optimized text
     let optimizedFile: Buffer;
     try {
-      optimizedFile = await createPDFFromText(cleanedOptimizedText);
+      optimizedFile = await generatePdf(cleanedOptimizedText);
     } catch (error) {
       console.error('PDF creation error:', error);
       throw new Error('Failed to create optimized PDF');
