@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ResumeUpload from '@/app/components/ResumeUpload';
 
+interface Suggestion {
+  id: string;
+  suggestion: string;
+  details: string;
+  impact: string;
+  category: string;
+}
+
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [files, setFiles] = useState<{
@@ -33,7 +41,7 @@ export default function Dashboard() {
   const router = useRouter();
   const supabase = createClient();
 
-  const handleFileUpload = (type: 'resume' | 'jobDescription', file: File) => {
+  const handleFileUpload = (type: 'resume' | 'jobDescription', file: File | null) => {
     setFiles(prev => ({
       ...prev,
       [type]: file
@@ -423,7 +431,7 @@ export default function Dashboard() {
               <div className="bg-white p-6 rounded-lg border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Suggestions</h2>
                 <div className="space-y-4">
-                  {analysisResults.suggestions.map((suggestion: any, index: number) => (
+                  {analysisResults.suggestions.map((suggestion: Suggestion, index: number) => (
                     <div
                       key={index}
                       className={`p-4 rounded-lg border transition-all ${
@@ -483,7 +491,7 @@ export default function Dashboard() {
                             if (selectedSuggestions.length === analysisResults.suggestions.length) {
                               setSelectedSuggestions([]);
                             } else {
-                              setSelectedSuggestions(analysisResults.suggestions.map(s => s.suggestion));
+                              setSelectedSuggestions(analysisResults.suggestions.map((s: Suggestion) => s.suggestion));
                             }
                           }
                         }}
@@ -496,7 +504,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-4">
-                      {analysisResults.suggestions.map((suggestion, index) => (
+                      {analysisResults.suggestions.map((suggestion: Suggestion, index: number) => (
                         <div
                           key={index}
                           className={`p-4 rounded-lg border transition-all ${

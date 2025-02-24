@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 import { createPDFFromText } from './pdf-utils';
-import cohere from 'cohere-ai';
+import { ChatRequest } from 'cohere-ai/api';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,16 +20,13 @@ if (!cohereApiKey) {
   throw new Error('Application configuration error: Missing Cohere API key. Please add COHERE_API_KEY to your .env.local file');
 }
 
-// Initialize Cohere
-const cohereClient = new cohere(cohereApiKey);
-
 // Initialize Supabase client
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { analysisId, selectedSuggestions } = data;
+    const { analysisId, selectedSuggestions, jobDescText } = data;
 
     if (!analysisId || !selectedSuggestions || !Array.isArray(selectedSuggestions)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -70,92 +67,117 @@ export async function POST(request: NextRequest) {
       details: s.details
     }));
 
-    // Generate optimization prompt
-    const prompt = `You are a professional resume optimizer. Your task is to improve the following resume based on specific suggestions.
-    Keep the formatting clean and simple, using only basic characters (letters, numbers, spaces, and basic punctuation).
-    Use bullet points (•) for listing items.
-    Maintain clear section headings.
-    Use consistent spacing.
+    // Generate optimized resume
+    try {
+      // Generate optimized resume using chat
+      const response = await fetch('https://api.cohere.ai/v2/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cohereApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "command-r-plus-08-2024",
+          messages: [
+            {
+              role: "user",
+              content: `You are a professional resume optimizer. Improve the following resume section to better match the job description.
 
-Original Resume:
+Resume Text:
 ${resumeText}
 
-Suggestions to implement:
-${suggestionsToImplement.map((s: any) => `- ${s.suggestion}: ${s.details}`).join('\n')}
+Job Description:
+${jobDescText}
 
-Instructions:
-1. Maintain the same overall structure and sections
-2. Keep all existing contact information and personal details
-3. Implement the suggested improvements while preserving other content
-4. Return only the optimized resume text, no explanations
-5. Use simple formatting:
-   - Basic bullet points (•) for lists
-   - Clear section headings in ALL CAPS
-   - Single blank line between sections
-   - No special characters or symbols
-6. Preserve all relevant experience and qualifications
-7. Keep formatting consistent throughout
+Please provide:
+1. An optimized version of the resume text
+2. A list of specific improvements made
+3. Format your response as JSON with 'optimizedText' and 'improvements' array
 
-Optimized Resume:`;
-
-    // Generate optimized content
-    const optimizeResponse = await cohereClient.generate({
-      prompt,
-      model: 'command',
-      max_tokens: 2048,
-      temperature: 0.2
-    });
-
-    if (!optimizeResponse.body.generations?.[0]?.text) {
-      throw new Error('Failed to generate optimized resume');
+Example format:
+{
+  "optimizedText": "Improved resume text here...",
+  "improvements": [
+    {
+      "original": "Original text",
+      "improved": "Improved text",
+      "reason": "Explanation of improvement"
     }
-
-    const optimizedText = optimizeResponse.body.generations[0].text;
-
-    // Clean and validate the optimized text
-    const cleanedOptimizedText = optimizedText
-      .trim()
-      .replace(/[^\x20-\x7E\n]/g, '') // Remove non-ASCII characters
-      .replace(/\r\n/g, '\n')          // Normalize line endings
-      .replace(/[\n]{3,}/g, '\n\n');   // Remove excessive line breaks
-
-    if (!cleanedOptimizedText) {
-      throw new Error('Generated text is empty after cleaning');
-    }
-
-    // Create PDF from optimized text
-    let optimizedFile: Buffer;
-    try {
-      optimizedFile = await createPDFFromText(cleanedOptimizedText);
-    } catch (error) {
-      console.error('PDF creation error:', error);
-      throw new Error('Failed to create optimized PDF');
-    }
-
-    // Save optimized resume to storage
-    const optimizedFileName = `optimized_${filePath}`;
-    const { error: uploadError } = await supabase.storage
-      .from('optimized-resumes')
-      .upload(optimizedFileName, optimizedFile, {
-        contentType: 'application/pdf',
-        cacheControl: '3600'
+  ]
+}`
+            }
+          ]
+        }),
       });
 
-    if (uploadError) {
-      console.error('Error uploading optimized resume:', uploadError);
-      throw new Error('Failed to save optimized resume');
+      const result = await response.json();
+
+      // Parse the response
+      try {
+        const text = result.message.content[0].text;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0]);
+          const optimizedText = result.optimizedText || '';
+
+          // Clean and validate the optimized text
+          const cleanedOptimizedText = optimizedText
+            .trim()
+            .replace(/[^\x20-\x7E\n]/g, '') // Remove non-ASCII characters
+            .replace(/\r\n/g, '\n')          // Normalize line endings
+            .replace(/[\n]{3,}/g, '\n\n');   // Remove excessive line breaks
+
+          if (!cleanedOptimizedText) {
+            throw new Error('Generated text is empty after cleaning');
+          }
+
+          // Create PDF from optimized text
+          let optimizedFile: Buffer;
+          try {
+            optimizedFile = await createPDFFromText(cleanedOptimizedText);
+          } catch (error) {
+            console.error('PDF creation error:', error);
+            throw new Error('Failed to create optimized PDF');
+          }
+
+          // Save optimized resume to storage
+          const optimizedFileName = `optimized_${filePath}`;
+          const { error: uploadError } = await supabase.storage
+            .from('optimized-resumes')
+            .upload(optimizedFileName, optimizedFile, {
+              contentType: 'application/pdf',
+              cacheControl: '3600'
+            });
+
+          if (uploadError) {
+            console.error('Error uploading optimized resume:', uploadError);
+            throw new Error('Failed to save optimized resume');
+          }
+
+          // Get download URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('optimized-resumes')
+            .getPublicUrl(optimizedFileName);
+
+          return NextResponse.json({
+            success: true,
+            downloadUrl: publicUrl,
+            message: 'Resume optimized successfully'
+          });
+        }
+      } catch (error) {
+        console.error('Failed to parse optimization result:', error);
+      }
+
+      // Return original text if parsing fails
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to optimize resume'
+      });
+    } catch (error) {
+      console.error('Optimization error:', error);
+      return NextResponse.json({ error: 'Failed to optimize resume' }, { status: 500 });
     }
-
-    // Get download URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('optimized-resumes')
-      .getPublicUrl(optimizedFileName);
-
-    return NextResponse.json({
-      success: true,
-      downloadUrl: publicUrl,
-      message: 'Resume optimized successfully'
-    });
 
   } catch (error) {
     console.error('Optimization error:', error);

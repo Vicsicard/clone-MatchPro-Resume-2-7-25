@@ -5,9 +5,9 @@ import { useDropzone, Accept } from 'react-dropzone'
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
 
 interface ResumeUploadProps {
-  onFileSelect: (file: File) => void
+  onFileSelect: (file: File | null) => void
   accept?: string
-  file?: File
+  file?: File | null
   disabled?: boolean
 }
 

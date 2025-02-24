@@ -8,8 +8,11 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState(null);
 
-  const handleFileSelect = async (file: File) => {
-    if (!file) return;
+  const handleFileSelect = async (file: File | null) => {
+    if (!file) {
+      setAnalysisResult(null);
+      return;
+    }
 
     setIsUploading(true);
     setError(null);

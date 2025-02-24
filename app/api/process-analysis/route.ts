@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
-import cohere from 'cohere-ai';
+import { getClient } from '../utils/cohere';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,7 +20,6 @@ if (!cohereApiKey) {
 }
 
 // Initialize clients
-const cohereClient = new cohere(cohereApiKey);
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
 export const runtime = 'nodejs';
@@ -44,17 +43,33 @@ interface CohereEmbedResponse {
 
 async function generateEmbedding(text: string): Promise<number[]> {
   console.log('Calling Cohere API...');
-  const response = await cohereClient.embed({
-    texts: [text],
-    model: 'embed-english-v3.0',
-    inputType: 'search_document',
-  });
+  try {
+    // Call Cohere API directly
+    const response = await fetch('https://api.cohere.ai/v2/embed', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cohereApiKey}`,
+      },
+      body: JSON.stringify({
+        texts: [text],
+        model: 'embed-english-v3.0',
+        inputType: 'search_document',
+        embeddingTypes: ['float']
+      })
+    });
 
-  if (!response.embeddings || !response.embeddings[0]) {
-    throw new Error('Failed to generate embedding');
+    const result = await response.json();
+
+    if (!result.embeddings || result.embeddings.length === 0) {
+      throw new Error('Failed to generate embedding');
+    }
+
+    return result.embeddings[0];
+  } catch (error: any) {
+    console.error('Error generating embedding:', error);
+    throw error;
   }
-
-  return response.embeddings[0];
 }
 
 export async function POST(req: Request) {

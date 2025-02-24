@@ -15,12 +15,14 @@ export interface CohereAnalysisResult {
 
 export class CohereService {
   private client: CohereClient;
+  private apiKey: string;
   private static instance: CohereService;
 
   private constructor(apiKey: string) {
     this.client = new CohereClient({
       token: apiKey
     });
+    this.apiKey = apiKey;
   }
 
   public static getInstance(apiKey: string): CohereService {
@@ -46,9 +48,18 @@ export class CohereService {
   public async analyzeResume(resumeText: string, jobDescText: string): Promise<CohereAnalysisResult> {
     try {
       // Get suggestions using chat
-      const chatResponse = await this.retry(() => 
-        this.client.chat({
-          message: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
+      const response = await fetch('https://api.cohere.ai/v2/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'command-r-plus-08-2024',
+          messages: [
+            {
+              role: 'user',
+              content: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Resume Text:
 ${resumeText}
@@ -69,30 +80,42 @@ Format your response as a JSON array of suggestions, each with a 'suggestion' ti
     "suggestion": "Add missing technical skills",
     "details": "Include Python and SQL skills as they are explicitly required in the job description"
   }
-]`,
-          model: 'command',
+]`
+            }
+          ]
         })
-      );
+      });
+
+      const chatResponse = await response.json();
 
       // Get embeddings for similarity calculation
-      const embedResponse = await this.retry(() =>
-        this.client.embed({
+      const embedResponse = await fetch('https://api.cohere.ai/v2/embed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
           texts: [resumeText, jobDescText],
           model: 'embed-english-v3.0',
-          inputType: 'search_document'
+          inputType: 'search_document',
+          embeddingTypes: ['float']
         })
-      );
+      });
+
+      const embedResult = await embedResponse.json();
 
       // Calculate similarity score
       const similarityScore = this.calculateCosineSimilarity(
-        embedResponse.embeddings[0],
-        embedResponse.embeddings[1]
+        embedResult.embeddings[0],
+        embedResult.embeddings[1]
       );
 
       // Parse suggestions from chat response
       let suggestions;
       try {
-        const jsonMatch = chatResponse.text.match(/\[[\s\S]*\]/);
+        const text = chatResponse.message.content[0].text;
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
         suggestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
       } catch (error) {
         console.error('Failed to parse suggestions:', error);
@@ -100,12 +123,12 @@ Format your response as a JSON array of suggestions, each with a 'suggestion' ti
       }
 
       return {
-        suggestions: suggestions.slice(0, 5), // Limit to 5 suggestions
+        suggestions,
         similarityScore
       };
     } catch (error) {
-      console.error('Cohere analysis failed:', error);
-      throw new Error(`Failed to analyze resume: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Error in analyzeResume:', error);
+      throw error;
     }
   }
 
