@@ -4,10 +4,22 @@ import { useState } from 'react';
 import ResumeUpload from '@/app/components/ResumeUpload';
 import { toast } from 'react-hot-toast';
 
+interface Suggestion {
+  suggestion: string;
+  details: string;
+}
+
+interface AnalysisResult {
+  id: string;
+  status: string;
+  similarityScore: number;
+  suggestions: Suggestion[];
+}
+
 export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   const handleFileSelect = async (file: File | null) => {
     if (!file) {
@@ -82,7 +94,7 @@ export default function UploadPage() {
             
             <div className="space-y-4">
               <h3 className="font-medium">Suggestions</h3>
-              {analysisResult.suggestions.map((suggestion: any, index: number) => (
+              {analysisResult.suggestions.map((suggestion, index) => (
                 <div key={index} className="p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium text-blue-600">{suggestion.suggestion}</h4>
                   <p className="mt-2 text-gray-700">{suggestion.details}</p>
