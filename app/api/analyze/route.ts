@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       const { error: bucketError } = await supabase.storage.createBucket('resumes', {
         public: false,
         allowedMimeTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
-        fileSize: '10MB'
+        fileSizeLimit: '10MB'
       });
 
       if (bucketError) {
