@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
-import { generatePdf } from './pdf-utils';
-import cohere from 'cohere-ai';
+import { createPDFFromText } from './pdf-utils';
+import { CohereClient } from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -24,7 +24,7 @@ if (!cohereApiKey) {
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
 // Initialize Cohere client
-const cohereClient = cohere.ClientV2(cohereApiKey);
+const cohereClient = new CohereClient({ token: cohereApiKey });
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,7 +132,7 @@ Optimized Resume:`;
     // Create PDF from optimized text
     let optimizedFile: Buffer;
     try {
-      optimizedFile = await generatePdf(cleanedOptimizedText);
+      optimizedFile = await createPDFFromText(cleanedOptimizedText);
     } catch (error) {
       console.error('PDF creation error:', error);
       throw new Error('Failed to create optimized PDF');
