@@ -210,54 +210,51 @@ export async function POST(request: NextRequest) {
       // Analyze with Cohere
       console.log('Starting Cohere analysis...');
       try {
-        // Generate suggestions with Cohere
-        console.log('Generating suggestions with Cohere...');
+        // Generate suggestions using Cohere
         let response;
         try {
-          response = await cohere.generate({
+          response = await cohere.generateText({
             prompt: `You are a professional resume analyzer. Analyze the resume and provide suggestions for improvement based on the job description.
 
 Your task is to return ONLY a valid JSON array containing 3-5 suggestions in this exact format:
 [
   {
-    "suggestion": "Brief, actionable suggestion title",
-    "details": "Detailed explanation of what should be changed and why",
-    "impact": "High/Medium/Low",
-    "category": "Skills/Experience/Education/Format/Content"
+    "suggestion": "Brief, clear suggestion title",
+    "details": "Detailed explanation of the suggestion with specific examples from the resume"
   }
 ]
 
-Resume:
+Resume Text:
 ${resumeText}
 
 Job Description:
 ${jobDescText}
 
 Remember:
-1. Return ONLY the JSON array, no other text
-2. Each suggestion must have all four fields
-3. Impact must be exactly "High", "Medium", or "Low"
-4. Category must be exactly one of: "Skills", "Experience", "Education", "Format", "Content"
-5. Make suggestions specific and actionable
-6. Focus on the most impactful improvements first`,
+1. Focus on actionable, specific improvements
+2. Consider both the resume content and the job requirements
+3. Maintain professional tone
+4. Return ONLY valid JSON array
+5. Include 3-5 suggestions maximum
+
+Suggestions:`,
             model: 'command',
-            maxTokens: 2000,
+            maxTokens: 1000,
             temperature: 0.2,
             returnLikelihoods: 'NONE',
             truncate: 'END'
           });
-        } catch (cohereError) {
-          console.error('Cohere generation API error:', cohereError);
-          const errorMessage = cohereError instanceof Error ? cohereError.message : JSON.stringify(cohereError);
-          throw new Error(`Cohere generation API failed: ${errorMessage}`);
+        } catch (error) {
+          console.error('Cohere API error:', error);
+          throw new Error('Failed to generate suggestions');
         }
 
         if (!response.generations || !response.generations[0]) {
-          throw new Error('No suggestions generated from Cohere');
+          throw new Error('No suggestions generated');
         }
 
-        const suggestions = response.generations[0].text;
-        console.log('Raw suggestions:', suggestions);
+        const generatedText = response.generations[0].text;
+        console.log('Raw suggestions:', generatedText);
 
         // Parse suggestions
         let parsedSuggestions = [
@@ -284,7 +281,7 @@ Remember:
         try {
           console.log('Parsing suggestions...');
           // Clean up the response to ensure valid JSON
-          const suggestionText = suggestions
+          const suggestionText = generatedText
             .trim()
             .replace(/^[^[]*\[/, '[') // Remove any text before the first [
             .replace(/][^]]*$/, ']') // Remove any text after the last ]
@@ -299,11 +296,7 @@ Remember:
                 // Validate each suggestion
                 const validSuggestions = tempSuggestions.filter(suggestion => 
                   suggestion.suggestion && 
-                  suggestion.details && 
-                  suggestion.impact && 
-                  suggestion.category &&
-                  ['High', 'Medium', 'Low'].includes(suggestion.impact) &&
-                  ['Skills', 'Experience', 'Education', 'Format', 'Content'].includes(suggestion.category)
+                  suggestion.details
                 );
                 
                 if (validSuggestions.length >= 3) {
@@ -316,7 +309,7 @@ Remember:
           }
         } catch (parseError) {
           console.error('Failed to parse suggestions:', parseError);
-          console.log('Raw suggestions text:', suggestions);
+          console.log('Raw suggestions text:', generatedText);
         }
         
         console.log('Final suggestions:', parsedSuggestions);
