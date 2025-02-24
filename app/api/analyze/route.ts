@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
 import { Database } from '@/types/supabase';
 import { Buffer } from 'buffer';
-import cohere from 'cohere-ai';
+import { CohereClient } from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -22,7 +22,7 @@ if (!cohereApiKey) {
 }
 
 // Initialize Cohere
-cohere.init(cohereApiKey);
+const cohere = new CohereClient({ token: cohereApiKey });
 
 export const runtime = 'nodejs';
 export const preferredRegion = 'auto';
