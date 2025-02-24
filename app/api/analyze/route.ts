@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
 import { Database } from '@/types/supabase';
 import { Buffer } from 'buffer';
-import { CohereClient, CohereApiError } from 'cohere-ai';
+import { CohereClient } from 'cohere-ai';
 
 // Initialize environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
