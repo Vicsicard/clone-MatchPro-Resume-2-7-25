@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     console.log('Form data fields:', Array.from(formData.keys()));
     
     const resumeFile = formData.get('resume') as File | null;
-    const jobDescFile = formData.get('jobDesc') as File | null;
+    const jobDescFile = formData.get('jobDescription') as File | null;
     const userId = formData.get('userId') as string | null;
 
     console.log('Request details:', {

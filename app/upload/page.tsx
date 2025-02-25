@@ -48,7 +48,7 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append('resume', file);
-      formData.append('jobDesc', file); // For testing, using same file
+      formData.append('jobDescription', file); // For testing, using same file
       formData.append('userId', 'test-user'); // TODO: Get actual user ID
 
       console.log('Uploading file:', {
