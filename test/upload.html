@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resume Upload Test</title>
+</head>
+<body>
+    <h2>Upload Resume</h2>
+    <form id="uploadForm">
+        <input type="file" name="file" accept=".pdf,.docx" required>
+        <button type="submit">Upload</button>
+    </form>
+    <pre id="result"></pre>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('http://localhost:3002/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('result').textContent = 'Error: ' + error.message;
+            }
+        };
+    </script>
+</body>
+</html>

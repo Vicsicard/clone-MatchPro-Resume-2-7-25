@@ -1,0 +1,27 @@
+Senior Full Stack Developer
+
+We are looking for a Senior Full Stack Developer to join our growing team. The ideal candidate will have strong experience in both frontend and backend development.
+
+Requirements:
+- 5+ years of experience in software development
+- Strong proficiency in Python and JavaScript
+- Experience with React and Node.js
+- Knowledge of database design and optimization
+- Experience with cloud platforms (AWS/Azure/GCP)
+- Strong understanding of CI/CD practices
+- Experience leading development teams
+
+Responsibilities:
+- Design and implement scalable web applications
+- Lead and mentor junior developers
+- Write clean, maintainable code
+- Optimize application performance
+- Collaborate with product and design teams
+
+Skills:
+- Python, JavaScript, TypeScript
+- React, Node.js
+- Git, Docker
+- PostgreSQL/MySQL
+- AWS/Cloud platforms
+- CI/CD tools
