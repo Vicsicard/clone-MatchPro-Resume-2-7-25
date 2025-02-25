@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter selected suggestions
-    const suggestionsToImplement = originalSuggestions.filter(s => 
+    const suggestionsToImplement = originalSuggestions.filter((s: { suggestion: string, details: string }) => 
       selectedSuggestions.includes(s.suggestion)
     );
 

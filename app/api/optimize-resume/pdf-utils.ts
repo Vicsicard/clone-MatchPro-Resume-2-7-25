@@ -1,5 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { PageSizes } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PageSizes } from 'pdf-lib';
 
 export async function createPDFFromText(text: string): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
