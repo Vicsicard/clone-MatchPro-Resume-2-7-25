@@ -16,6 +16,13 @@ interface AnalysisResult {
   suggestions: Suggestion[];
 }
 
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
+
 export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +31,14 @@ export default function UploadPage() {
   const handleFileSelect = async (file: File | null) => {
     if (!file) {
       setAnalysisResult(null);
+      return;
+    }
+
+    // Validate file type
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      const errorMessage = `Invalid file type. Please upload a PDF, DOC, DOCX, or TXT file. Received: ${file.type}`;
+      setError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
@@ -36,18 +51,24 @@ export default function UploadPage() {
       formData.append('jobDesc', file); // For testing, using same file
       formData.append('userId', 'test-user'); // TODO: Get actual user ID
 
+      console.log('Uploading file:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
+        throw new Error(responseData.error || `Upload failed: ${response.statusText}`);
       }
 
-      const result = await response.json();
-      setAnalysisResult(result);
+      setAnalysisResult(responseData);
       toast.success('Resume analyzed successfully!');
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during upload';
@@ -67,7 +88,11 @@ export default function UploadPage() {
         <ResumeUpload
           onFileSelect={handleFileSelect}
           disabled={isUploading}
+          accept=".pdf,.doc,.docx,.txt"
         />
+        <p className="mt-2 text-sm text-gray-600">
+          Supported file types: PDF, DOC, DOCX, TXT
+        </p>
       </div>
 
       {isUploading && (
