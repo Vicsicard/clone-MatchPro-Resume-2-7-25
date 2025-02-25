@@ -114,7 +114,33 @@ export default function Dashboard() {
       setAnalysisStatus('completed');
       setAnalysisResults(data);
       
-      if (data.similarity_score) {
+      // Ensure we have suggestions array
+      if (!data.suggestions || !Array.isArray(data.suggestions)) {
+        console.warn('No suggestions found in analysis results, setting defaults');
+        data.suggestions = [
+          {
+            suggestion: "Add relevant skills",
+            details: "Include more skills mentioned in the job description to improve your match score.",
+            impact: "High",
+            category: "Skills"
+          },
+          {
+            suggestion: "Highlight relevant experience",
+            details: "Focus on experiences that directly relate to the job requirements.",
+            impact: "Medium", 
+            category: "Experience"
+          },
+          {
+            suggestion: "Include industry keywords",
+            details: "Add industry-specific keywords from the job posting to improve your resume's relevance.",
+            impact: "High",
+            category: "Keywords"
+          }
+        ];
+        setAnalysisResults({...data});
+      }
+      
+      if (data.similarity_score !== undefined) {
         const score = Math.round(data.similarity_score * 100);
         setStatusMessage(`Analysis complete! Match score: ${score}%`);
       } else {
@@ -150,7 +176,7 @@ export default function Dashboard() {
   };
 
   const handleOptimize = async () => {
-    if (!selectedSuggestions.length || !analysisResults?.id) {
+    if (!selectedSuggestions.length || !analysisResults) {
       setNotification({
         type: 'error',
         message: 'Please select at least one suggestion to implement'
@@ -160,7 +186,22 @@ export default function Dashboard() {
     
     setIsOptimizing(true);
     setOptimizationProgress('Starting optimization...');
+    
     try {
+      // Get complete analysis data including the job description text
+      const { data: analysis, error: analysisError } = await supabase
+        .from('analyses')
+        .select('*')
+        .eq('id', analysisResults.analysisId)
+        .single();
+        
+      if (analysisError) {
+        throw new Error('Failed to retrieve analysis data');
+      }
+      
+      // Extract job description text from the analysis
+      const jobDescText = analysis.content_json?.jobDescriptionText || '';
+      
       const response = await fetch('/api/optimize-resume', {
         method: 'POST',
         headers: {
@@ -168,8 +209,9 @@ export default function Dashboard() {
           Authorization: `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          analysisId: analysisResults.id,
-          selectedSuggestions: selectedSuggestions
+          analysisId: analysisResults.analysisId,
+          selectedSuggestions: selectedSuggestions,
+          jobDescText: jobDescText
         })
       });
 
@@ -416,67 +458,73 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Analysis Results */}
           {analysisResults && (
             <div className="mt-8 space-y-6">
               {/* Match Score */}
               <div className="bg-white p-6 rounded-lg border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Match Score</h2>
                 <div className="text-3xl font-bold text-blue-600">
-                  {Math.round(analysisResults.similarity_score * 100)}%
+                  {analysisResults?.similarity_score !== undefined 
+                    ? `${Math.round(analysisResults.similarity_score * 100)}%`
+                    : 'N/A'}
                 </div>
               </div>
 
               {/* Suggestions */}
               <div className="bg-white p-6 rounded-lg border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Suggestions</h2>
-                <div className="space-y-4">
-                  {analysisResults.suggestions.map((suggestion: Suggestion, index: number) => (
-                    <div
-                      key={index}
-                      className={`p-4 rounded-lg border transition-all ${
-                        selectedSuggestions.includes(suggestion.suggestion)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedSuggestions.includes(suggestion.suggestion)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleSuggestionSelect(suggestion.suggestion);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-4 w-4 text-blue-600 rounded cursor-pointer"
-                            />
-                            <h4 className="font-medium cursor-pointer" onClick={() => handleSuggestionSelect(suggestion.suggestion)}>
-                              {suggestion.suggestion}
-                            </h4>
+                {(!analysisResults?.suggestions || analysisResults.suggestions.length === 0) ? (
+                  <div className="text-gray-500">No suggestions available</div>
+                ) : (
+                  <div className="space-y-4">
+                    {analysisResults.suggestions.map((suggestion: Suggestion, index: number) => (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border transition-all ${
+                          selectedSuggestions.includes(suggestion.suggestion)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        onClick={() => handleSuggestionSelect(suggestion.suggestion)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedSuggestions.includes(suggestion.suggestion)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleSuggestionSelect(suggestion.suggestion);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-4 w-4 text-blue-600 rounded cursor-pointer"
+                              />
+                              <h4 className="font-medium cursor-pointer" onClick={() => handleSuggestionSelect(suggestion.suggestion)}>
+                                {suggestion.suggestion}
+                              </h4>
+                            </div>
+                            <p className="text-gray-600 mt-2 ml-6">{suggestion.details}</p>
                           </div>
-                          <p className="text-gray-600 mt-2 ml-6">{suggestion.details}</p>
-                        </div>
-                        <div className="flex items-center space-x-2 ml-4">
-                          <span className={`px-2 py-1 rounded text-sm ${
-                            suggestion.impact === 'High'
-                              ? 'bg-red-100 text-red-800'
-                              : suggestion.impact === 'Medium'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {suggestion.impact}
-                          </span>
-                          <span className="px-2 py-1 bg-gray-100 rounded text-sm">
-                            {suggestion.category}
-                          </span>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <span className={`px-2 py-1 rounded text-sm ${
+                              suggestion.impact === 'High'
+                                ? 'bg-red-100 text-red-800'
+                                : suggestion.impact === 'Medium'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {suggestion.impact}
+                            </span>
+                            <span className="px-2 py-1 bg-gray-100 rounded text-sm">
+                              {suggestion.category}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Suggestions and Optimization UI */}

@@ -6,6 +6,9 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ['pdf-parse', 'mammoth'],
+  },
+  env: {
+    APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
   }
 };
 

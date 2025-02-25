@@ -30,15 +30,28 @@ export const preferredRegion = 'auto';
 
 export async function POST(request: NextRequest) {
   try {
+    // Get authorization token
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing or invalid authorization token' }, { status: 401 });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
+    }
+
     // Log request details
-    console.log('Received analyze request');
+    console.log('Received analyze request from user:', user.id);
     
     const formData = await request.formData();
     console.log('Form data fields:', Array.from(formData.keys()));
     
     const resumeFile = formData.get('resume') as File | null;
     const jobDescFile = formData.get('jobDescription') as File | null;
-    const userId = formData.get('userId') as string | null;
 
     console.log('Request details:', {
       hasResumeFile: !!resumeFile,
@@ -47,32 +60,33 @@ export async function POST(request: NextRequest) {
       hasJobDescFile: !!jobDescFile,
       jobDescFileType: jobDescFile?.type,
       jobDescFileName: jobDescFile?.name,
-      hasUserId: !!userId
+      userId: user.id
     });
 
-    if (!resumeFile || !jobDescFile || !userId) {
-      console.error('Missing required fields:', {
+    if (!resumeFile || !jobDescFile) {
+      console.error('Missing required files:', {
         hasResumeFile: !!resumeFile,
-        hasJobDescFile: !!jobDescFile,
-        hasUserId: !!userId
+        hasJobDescFile: !!jobDescFile
       });
       return NextResponse.json({ 
-        error: 'Missing required files or user ID',
+        error: 'Missing required files',
         details: {
           resume: !resumeFile ? 'Missing resume file' : null,
-          jobDesc: !jobDescFile ? 'Missing job description file' : null,
-          userId: !userId ? 'Missing user ID' : null
+          jobDesc: !jobDescFile ? 'Missing job description file' : null
         }
       }, { status: 400 });
     }
 
     // Create analysis record
-    console.log('Creating analysis record for user:', userId);
+    console.log('Creating analysis record for user:', user.id);
     const { data: analysis, error: createError } = await supabase
       .from('analyses')
       .insert({
-        user_id: userId,
+        user_id: user.id,
         status: 'processing',
+        file_name: resumeFile.name,
+        original_filename: resumeFile.name,
+        job_description_path: jobDescFile.name,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -89,7 +103,13 @@ export async function POST(request: NextRequest) {
 
     try {
       // Process files and extract text
-      console.log('Processing files');
+      console.log('Processing files with details:', {
+        resumeType: resumeFile.type,
+        resumeSize: resumeFile.size,
+        jobDescType: jobDescFile.type,
+        jobDescSize: jobDescFile.size
+      });
+      
       const resumeBuffer = Buffer.from(await resumeFile.arrayBuffer());
       const jobDescBuffer = Buffer.from(await jobDescFile.arrayBuffer());
 
@@ -104,8 +124,19 @@ export async function POST(request: NextRequest) {
           resumeText = resumeData.text;
           console.log('Successfully parsed resume PDF, text length:', resumeText.length);
         } catch (error) {
-          console.error('Failed to parse resume PDF:', error);
-          return NextResponse.json({ error: 'Failed to parse resume PDF', details: error }, { status: 400 });
+          console.error('Failed to parse resume PDF:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            fileType: resumeFile.type,
+            fileSize: resumeBuffer.length
+          });
+          return NextResponse.json({ 
+            error: 'Failed to parse resume PDF', 
+            details: {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              phase: 'resume_parsing'
+            }
+          }, { status: 400 });
         }
       } else {
         console.log('Reading resume as text file');
@@ -120,8 +151,19 @@ export async function POST(request: NextRequest) {
           jobDescText = jobDescData.text;
           console.log('Successfully parsed job description PDF, text length:', jobDescText.length);
         } catch (error) {
-          console.error('Failed to parse job description PDF:', error);
-          return NextResponse.json({ error: 'Failed to parse job description PDF', details: error }, { status: 400 });
+          console.error('Failed to parse job description PDF:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            fileType: jobDescFile.type,
+            fileSize: jobDescBuffer.length
+          });
+          return NextResponse.json({ 
+            error: 'Failed to parse job description PDF', 
+            details: {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              phase: 'job_description_parsing'
+            }
+          }, { status: 400 });
         }
       } else {
         console.log('Reading job description as text file');
@@ -130,68 +172,95 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Test Cohere connection first
+        console.log('Testing Cohere API connection...');
+        await cohereService.callCohereAPI('chat', {
+          model: 'command-r-plus-08-2024',
+          messages: [{ role: 'user', content: 'test' }],
+          temperature: 0.7,
+          max_tokens: 10
+        });
+        console.log('Cohere API connection test successful');
+
         // Analyze resume using Cohere service
-        console.log('Analyzing resume with Cohere service');
+        console.log('Starting resume analysis with text lengths:', {
+          resumeLength: resumeText.length,
+          jobDescLength: jobDescText.length
+        });
+        
         const analysisResult = await cohereService.analyzeResume(resumeText, jobDescText);
-        console.log('Successfully analyzed resume');
+        console.log('Successfully completed analysis:', {
+          hasSuggestions: analysisResult.suggestions?.length > 0,
+          similarityScore: analysisResult.similarityScore
+        });
 
         // Update analysis record with results
-        console.log('Updating analysis record with results');
-        const { error: finalUpdateError } = await supabase
+        const { error: updateError } = await supabase
           .from('analyses')
           .update({
             status: 'completed',
-            similarity_score: analysisResult.similarityScore,
-            suggestions: analysisResult.suggestions,
             content_json: {
               suggestions: analysisResult.suggestions,
-              similarity_score: analysisResult.similarityScore
+              similarityScore: analysisResult.similarityScore,
+              resumeText: resumeText,
+              jobDescriptionText: jobDescText
             },
             updated_at: new Date().toISOString()
           })
           .eq('id', analysisId);
 
-        if (finalUpdateError) {
-          console.error('Failed to update analysis record with results:', finalUpdateError);
-          return NextResponse.json({ error: 'Failed to update analysis record', details: finalUpdateError }, { status: 500 });
+        if (updateError) {
+          console.error('Failed to update analysis record:', updateError);
+          return NextResponse.json({ error: 'Failed to update analysis record', details: updateError }, { status: 500 });
         }
 
-        console.log('Analysis completed successfully');
-        return NextResponse.json({
-          id: analysisId,
-          status: 'completed',
-          similarityScore: analysisResult.similarityScore,
-          suggestions: analysisResult.suggestions
+        return NextResponse.json({ 
+          success: true, 
+          analysisId,
+          suggestions: analysisResult.suggestions,
+          similarity_score: analysisResult.similarityScore
         });
       } catch (error) {
-        console.error('Failed to analyze resume:', error);
-        
-        // Update analysis record with error
-        await supabase
+        console.error('Analysis error:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          phase: 'cohere_analysis'
+        });
+
+        // Update analysis record to failed state
+        const { error: updateError } = await supabase
           .from('analyses')
           .update({
-            status: 'error',
-            error_message: error instanceof Error ? error.message : String(error),
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
             updated_at: new Date().toISOString()
           })
           .eq('id', analysisId);
 
-        return NextResponse.json({ error: 'Failed to analyze resume', details: error }, { status: 500 });
+        if (updateError) {
+          console.error('Failed to update analysis record after error:', updateError);
+        }
+
+        return NextResponse.json({ 
+          error: 'Failed to analyze resume', 
+          details: {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            phase: 'cohere_analysis'
+          }
+        }, { status: 500 });
       }
     } catch (error) {
-      console.error('Failed to process files:', error);
-
-      // Update analysis record with error
-      await supabase
-        .from('analyses')
-        .update({
-          status: 'error',
-          error_message: error instanceof Error ? error.message : String(error),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', analysisId);
-
-      return NextResponse.json({ error: 'Failed to process files', details: error }, { status: 500 });
+      console.error('Unexpected error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      return NextResponse.json({ 
+        error: 'An unexpected error occurred', 
+        details: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          phase: 'unknown'
+        }
+      }, { status: 500 });
     }
   } catch (error) {
     console.error('Unexpected error:', error);

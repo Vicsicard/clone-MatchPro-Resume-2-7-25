@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Get the analysis record
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
-      .select('resume_text, file_path')
+      .select('content_json')
       .eq('id', analysisId)
       .single();
 
@@ -44,44 +44,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Analysis record not found' }, { status: 404 });
     }
 
-    const { resume_text: resumeText, file_path: filePath } = analysis;
-
-    if (!resumeText || !filePath) {
-      return NextResponse.json({ error: 'Resume text or file path not found in analysis record' }, { status: 400 });
+    // Extract resume text and file path from content_json
+    const resumeText = analysis.content_json?.resumeText;
+    const originalSuggestions = analysis.content_json?.suggestions || [];
+    
+    if (!resumeText) {
+      return NextResponse.json({ error: 'Resume text not found in analysis record' }, { status: 400 });
     }
 
-    // Get suggestions from selected IDs
-    const { data: suggestions, error: suggestionsError } = await supabase
-      .from('suggestions')
-      .select('suggestion, details')
-      .eq('analysis_id', analysisId)
-      .in('id', selectedSuggestions);
+    // Filter selected suggestions
+    const suggestionsToImplement = originalSuggestions.filter(s => 
+      selectedSuggestions.includes(s.suggestion)
+    );
 
-    if (suggestionsError || !suggestions) {
-      console.error('Error fetching suggestions:', suggestionsError);
-      return NextResponse.json({ error: 'Failed to fetch selected suggestions' }, { status: 500 });
-    }
-
-    const suggestionsToImplement = suggestions.map(s => ({
-      suggestion: s.suggestion,
-      details: s.details
-    }));
+    console.log('Implementing suggestions:', suggestionsToImplement);
 
     // Generate optimized resume
     try {
       // Generate optimized resume using chat
-      const response = await fetch('https://api.cohere.ai/v2/chat', {
+      const response = await fetch('https://api.cohere.ai/v1/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${cohereApiKey}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
-          model: "command-r-plus-08-2024",
-          messages: [
-            {
-              role: "user",
-              content: `You are a professional resume optimizer. Improve the following resume section to better match the job description.
+          model: "command-r-plus",
+          message: `You are a professional resume optimizer. Improve the following resume to better match the job description by implementing the selected suggestions.
 
 Resume Text:
 ${resumeText}
@@ -89,82 +79,82 @@ ${resumeText}
 Job Description:
 ${jobDescText}
 
-Please provide:
-1. An optimized version of the resume text
-2. A list of specific improvements made
-3. Format your response as JSON with 'optimizedText' and 'improvements' array
+Suggestions to implement (3-5 improvements total):
+${suggestionsToImplement.map((s, i) => `${i+1}. ${s.suggestion}: ${s.details}`).join('\n')}
 
-Example format:
-{
-  "optimizedText": "Improved resume text here...",
-  "improvements": [
-    {
-      "original": "Original text",
-      "improved": "Improved text",
-      "reason": "Explanation of improvement"
-    }
-  ]
-}`
-            }
-          ]
+Please provide:
+1. An optimized version of the resume text that implements ALL of the suggestions above
+2. Keep the same overall structure and formatting of the original resume
+3. Format your response as a clean resume document that can be easily converted to PDF
+4. Include ALL sections from the original resume, with improvements integrated naturally
+
+DO NOT include explanations, just return the optimized resume text.`
         }),
       });
 
       const result = await response.json();
-
+      
       // Parse the response
       try {
-        const text = result.message.content[0].text;
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const result = JSON.parse(jsonMatch[0]);
-          const optimizedText = result.optimizedText || '';
-
-          // Clean and validate the optimized text
-          const cleanedOptimizedText = optimizedText
-            .trim()
-            .replace(/[^\x20-\x7E\n]/g, '') // Remove non-ASCII characters
-            .replace(/\r\n/g, '\n')          // Normalize line endings
-            .replace(/[\n]{3,}/g, '\n\n');   // Remove excessive line breaks
-
-          if (!cleanedOptimizedText) {
-            throw new Error('Generated text is empty after cleaning');
-          }
-
-          // Create PDF from optimized text
-          let optimizedFile: Buffer;
-          try {
-            optimizedFile = await createPDFFromText(cleanedOptimizedText);
-          } catch (error) {
-            console.error('PDF creation error:', error);
-            throw new Error('Failed to create optimized PDF');
-          }
-
-          // Save optimized resume to storage
-          const optimizedFileName = `optimized_${filePath}`;
-          const { error: uploadError } = await supabase.storage
-            .from('optimized-resumes')
-            .upload(optimizedFileName, optimizedFile, {
-              contentType: 'application/pdf',
-              cacheControl: '3600'
-            });
-
-          if (uploadError) {
-            console.error('Error uploading optimized resume:', uploadError);
-            throw new Error('Failed to save optimized resume');
-          }
-
-          // Get download URL
-          const { data: { publicUrl } } = supabase.storage
-            .from('optimized-resumes')
-            .getPublicUrl(optimizedFileName);
-
-          return NextResponse.json({
-            success: true,
-            downloadUrl: publicUrl,
-            message: 'Resume optimized successfully'
-          });
+        let optimizedText = '';
+        
+        if (result.text) {
+          optimizedText = result.text;
+        } else if (result.message?.content) {
+          optimizedText = result.message.content;
+        } else if (result.generations && result.generations[0]) {
+          optimizedText = result.generations[0].text;
         }
+
+        // Clean and validate the optimized text
+        const cleanedOptimizedText = optimizedText
+          .trim()
+          .replace(/^```[\w]*\n/, '')  // Remove beginning markdown code block
+          .replace(/```$/, '')         // Remove ending markdown code block
+          .replace(/[^\x20-\x7E\n]/g, '') // Remove non-ASCII characters
+          .replace(/\r\n/g, '\n')      // Normalize line endings
+          .replace(/[\n]{3,}/g, '\n\n'); // Remove excessive line breaks
+
+        if (!cleanedOptimizedText) {
+          throw new Error('Generated text is empty after cleaning');
+        }
+
+        // Create PDF from optimized text
+        let optimizedFile: Buffer;
+        try {
+          optimizedFile = await createPDFFromText(cleanedOptimizedText);
+        } catch (error) {
+          console.error('PDF creation error:', error);
+          throw new Error('Failed to create optimized PDF');
+        }
+
+        // Create unique filename
+        const timestamp = new Date().getTime();
+        const optimizedFileName = `optimized_resume_${timestamp}.pdf`;
+        
+        // Save optimized resume to storage
+        const { error: uploadError } = await supabase.storage
+          .from('optimized-resumes')
+          .upload(optimizedFileName, optimizedFile, {
+            contentType: 'application/pdf',
+            cacheControl: '3600'
+          });
+
+        if (uploadError) {
+          console.error('Error uploading optimized resume:', uploadError);
+          throw new Error('Failed to save optimized resume');
+        }
+
+        // Get download URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('optimized-resumes')
+          .getPublicUrl(optimizedFileName);
+
+        return NextResponse.json({
+          success: true,
+          downloadUrl: publicUrl,
+          message: 'Resume optimized successfully'
+        });
       } catch (error) {
         console.error('Failed to parse optimization result:', error);
       }
