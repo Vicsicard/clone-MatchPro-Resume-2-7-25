@@ -80,7 +80,7 @@ Job Description:
 ${jobDescText}
 
 Suggestions to implement (3-5 improvements total):
-${suggestionsToImplement.map((s: { suggestion: string, details: string }, i) => `${i+1}. ${s.suggestion}: ${s.details}`).join('\n')}
+${suggestionsToImplement.map((s: { suggestion: string, details: string }, i: number) => `${i+1}. ${s.suggestion}: ${s.details}`).join('\n')}
 
 Please provide:
 1. An optimized version of the resume text that implements ALL of the suggestions above
